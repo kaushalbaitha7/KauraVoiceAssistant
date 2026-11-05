@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaura | Python Voice Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#"><span class="brand-mark">N</span><span>KAURA</span></a>
+      <span class="status"><i></i> PYTHON ASSISTANT ONLINE</span>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">YOUR PERSONAL AI COMPANION</p>
+      <h1>Speak naturally.<br><span>Get things done.</span></h1>
+      <p class="intro">A simple voice and text assistant powered by Python Flask and your browser's speech technology.</p>
+    </section>
+
+    <section class="assistant-card">
+      <div class="assistant-head">
+        <div>
+          <p class="eyebrow">KAURA ASSISTANT</p>
+          <h2>How can I help you?</h2>
+        </div>
+        <span class="live-pill"><i></i> READY</span>
+      </div>
+
+      <div class="orb-wrap">
+        <div class="orb-ring ring-a"></div>
+        <div class="orb-ring ring-b"></div>
+        <button id="micButton" class="orb" aria-label="Start voice input">
+          <span class="mic-icon">🎙</span>
+        </button>
+      </div>
+      <p id="micStatus" class="mic-status">Tap the microphone and start speaking</p>
+
+      <form id="chatForm" class="input-row">
+        <input id="messageInput" type="text" placeholder="Type a message or ask me anything..." autocomplete="off">
+        <button class="send-button" type="submit">Send <span>➜</span></button>
+      </form>
+
+      <div class="quick-prompts">
+        <span>TRY ASKING</span>
+        <button type="button" data-prompt="What time is it?">Time</button>
+        <button type="button" data-prompt="What is today's date?">Date</button>
+        <button type="button" data-prompt="Calculate 25 times 4">Calculate</button>
+        <button type="button" data-prompt="What can you do?">Help</button>
+      </div>
+
+      <div class="conversation">
+        <div class="conversation-title"><span>CONVERSATION</span><button id="clearButton" type="button">Clear chat</button></div>
+        <div id="chatLog" class="chat-log" aria-live="polite">
+          <div class="message assistant-message">
+            <div class="avatar">N</div>
+            <div class="bubble"><small>KAURA · ASSISTANT</small><p>Hello! I'm Kaura. You can speak to me or type your message below.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-grid">
+      <article><span>01</span><h3>Voice input</h3><p>Speak through your microphone using browser speech recognition.</p></article>
+      <article><span>02</span><h3>Text input</h3><p>Type a question and receive an instant assistant response.</p></article>
+      <article><span>03</span><h3>Voice output</h3><p>Kaura reads every response aloud using speech synthesis.</p></article>
+    </section>
+
+    <footer>BUILT WITH PYTHON · FLASK · HTML · CSS · JAVASCRIPT</footer>
+  </main>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
