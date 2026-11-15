@@ -1,25 +1,42 @@
 
 "use strict";
 
-// KAURA: Gemini-powered AI + browser speech recognition and speech output.
+/* =========================================
+   KAURA AI - GEMINI VOICE ASSISTANT
+   Speech recognition + wake phrase + TTS
+========================================= */
+
+// DOM ELEMENTS
 
 const $ = (id) => document.getElementById(id);
 
 const chatLog = $("chatLog");
 const chatForm = $("chatForm");
 const messageInput = $("messageInput");
+
 const micButton = $("micButton");
 const micStatus = $("micStatus");
+
 const wakeModeButton = $("wakeModeButton");
 const liveModeButton = $("liveModeButton");
+
 const liveButton = $("liveButton");
 const stopButton = $("stopButton");
+
 const clearButton = $("clearButton");
 const assistantOrb = $("assistantOrb");
+
+
+// SPEECH RECOGNITION SUPPORT
 
 const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
+
+
+// =========================================
+// APPLICATION STATE
+// =========================================
 
 let conversation = [];
 
@@ -37,6 +54,18 @@ let restartTimer = null;
 
 let commandAlreadySent = false;
 
+// In wake mode, this becomes true after KAURA hears
+// its wake phrase and asks the user for a command.
+let waitingForCommand = false;
+
+// Reset wake phrase state after KAURA finishes
+// speaking an answer to a command.
+let resetWakeAfterSpeech = false;
+
+
+// =========================================
+// STATUS AND ORB
+// =========================================
 
 function setStatus(text) {
 
@@ -64,6 +93,10 @@ function setOrb(state = "") {
 }
 
 
+// =========================================
+// CHAT MESSAGE DISPLAY
+// =========================================
+
 function addMessage(role, text) {
 
     if (!chatLog) return;
@@ -71,7 +104,9 @@ function addMessage(role, text) {
     const wrap = document.createElement("div");
 
     wrap.className =
-        `message ${role === "user" ? "user-message" : "assistant-message"}`;
+        `message ${role === "user"
+            ? "user-message"
+            : "assistant-message"}`;
 
     const avatar = document.createElement("div");
 
@@ -103,9 +138,15 @@ function addMessage(role, text) {
 }
 
 
+// =========================================
+// TEXT TO SPEECH
+// =========================================
+
 function speak(text) {
 
     if (!("speechSynthesis" in window)) {
+
+        speaking = false;
 
         afterSpeaking();
 
@@ -142,7 +183,9 @@ function speak(text) {
 
     };
 
-    utterance.onerror = () => {
+    utterance.onerror = (event) => {
+
+        console.error("Speech synthesis error:", event.error);
 
         speaking = false;
 
@@ -155,7 +198,19 @@ function speak(text) {
 }
 
 
+// =========================================
+// AFTER KAURA SPEAKS
+// =========================================
+
 function afterSpeaking() {
+
+    if (resetWakeAfterSpeech) {
+
+        waitingForCommand = false;
+
+        resetWakeAfterSpeech = false;
+
+    }
 
     if (!listeningEnabled) {
 
@@ -167,7 +222,9 @@ function afterSpeaking() {
 
     setStatus(
         mode === "wake"
-            ? 'Listening for "Hey KAURA"...'
+            ? waitingForCommand
+                ? "I'm listening. Tell me what you need."
+                : 'Listening for "Hey KAURA"...'
             : "KAURA is listening. Speak when ready."
     );
 
@@ -178,6 +235,10 @@ function afterSpeaking() {
 }
 
 
+// =========================================
+// RESTART MANAGEMENT
+// =========================================
+
 function scheduleRecognitionRestart() {
 
     clearTimeout(restartTimer);
@@ -186,25 +247,31 @@ function scheduleRecognitionRestart() {
         !listeningEnabled ||
         busy ||
         speaking ||
+        recognition ||
         document.hidden
     ) {
         return;
     }
 
-    restartTimer = setTimeout(
-        startRecognition,
-        700
-    );
+    restartTimer = setTimeout(() => {
+
+        startRecognition();
+
+    }, 900);
 
 }
 
+
+// =========================================
+// CREATE RECOGNITION
+// =========================================
 
 function createRecognition() {
 
     if (!SpeechRecognition) {
 
         setStatus(
-            "Speech recognition is not supported here. Use Chrome or Edge."
+            "Speech recognition is not supported. Try Chrome."
         );
 
         return null;
@@ -213,17 +280,52 @@ function createRecognition() {
 
     const r = new SpeechRecognition();
 
+    // One utterance per session is more predictable
+    // across desktop and mobile Chrome.
+
     r.lang = "en-IN";
 
-    r.continuous = mode === "wake";
+    r.continuous = false;
 
     r.interimResults = true;
+
+    r.maxAlternatives = 3;
 
     return r;
 
 }
 
 
+// =========================================
+// WAKE PHRASE DETECTION
+// =========================================
+
+function extractWakeCommand(transcript) {
+
+    const cleaned = transcript
+        .toLowerCase()
+        .replace(/[.,!?;:]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    /*
+       Speech recognition sometimes interprets
+       KAURA as Cora, Kara or Koura.
+
+       These alternatives are accepted as wake phrases.
+    */
+
+    const wakePattern =
+        /\bhey\s+(?:kaura|cora|kara|koura|coura|kaora)\b\s*(.*)$/i;
+
+    return cleaned.match(wakePattern);
+
+}
+
+
+// =========================================
+// START RECOGNITION
+// =========================================
 
 function startRecognition() {
 
@@ -245,88 +347,233 @@ function startRecognition() {
 
     commandAlreadySent = false;
 
+
+    // RECOGNITION STARTED
+
     r.onstart = () => {
-        console.log("KAURA recognition started");
+
+        if (recognition !== r) return;
+
+        console.log("KAURA recognition started.");
 
         setOrb("listening");
 
         setStatus(
             mode === "wake"
-                ? 'Listening... Say "Hey KAURA".'
+                ? waitingForCommand
+                    ? "I'm listening for your command."
+                    : 'Listening... Say "Hey KAURA".'
                 : "I'm listening. Speak now."
         );
+
     };
+
+
+    // SPEECH RESULT
 
     r.onresult = (event) => {
 
-        const transcript = Array.from(event.results)
-            .map(result => result[0].transcript)
-            .join(" ")
-            .trim();
+        if (recognition !== r) return;
 
-        console.log("KAURA recognized:", transcript);
+        let finalTranscript = "";
 
-        if (!transcript) return;
+        let interimTranscript = "";
+
+        for (
+            let i = event.resultIndex;
+            i < event.results.length;
+            i++
+        ) {
+
+            const result = event.results[i];
+
+            const transcript =
+                result[0].transcript.trim();
+
+            // Never send interim results to Gemini.
+
+            if (result.isFinal) {
+
+                finalTranscript += transcript + " ";
+
+            } else {
+
+                interimTranscript += transcript + " ";
+
+            }
+
+        }
+
+
+        // Show interim speech in the browser console.
+        if (interimTranscript.trim()) {
+
+            console.log(
+                "KAURA hearing:",
+                interimTranscript.trim()
+            );
+
+        }
+
+
+        finalTranscript = finalTranscript.trim();
+
+        if (!finalTranscript) return;
 
         if (commandAlreadySent) return;
 
-        if (mode === "wake") {
 
-            const match = transcript.match(
-                /\bhey\s+kaura\b[\s,.:;-]*(.*)/i
-            );
+        console.log(
+            "KAURA final transcript:",
+            finalTranscript
+        );
 
-            if (!match) {
-                return;
-            }
+
+        // VOICE CONVERSATION MODE
+
+        if (mode === "conversation") {
 
             commandAlreadySent = true;
 
-            const command = match[1].trim();
+            stopRecognition();
+
+            sendMessage(finalTranscript, true);
+
+            return;
+
+        }
+
+
+        // WAKE MODE: ALREADY AWAKENED
+
+        if (waitingForCommand) {
+
+            commandAlreadySent = true;
+
+            waitingForCommand = false;
+
+            resetWakeAfterSpeech = true;
 
             stopRecognition();
 
-            if (command) {
-                sendMessage(command, true);
-            } else {
-                speak(
-                    "Yes, I'm listening. What can I do for you?"
-                );
-            }
+            sendMessage(finalTranscript, true);
+
+            return;
+
+        }
+
+
+        // WAKE MODE: DETECT WAKE PHRASE
+
+        const match = extractWakeCommand(finalTranscript);
+
+        if (!match) {
+
+            console.log(
+                "Wake phrase not detected:",
+                finalTranscript
+            );
+
+            return;
+
+        }
+
+        const command = (match[1] || "").trim();
+
+        commandAlreadySent = true;
+
+        stopRecognition();
+
+
+        // Wake phrase and command in the same sentence.
+
+        if (command) {
+
+            waitingForCommand = false;
+
+            resetWakeAfterSpeech = true;
+
+            sendMessage(command, true);
 
         } else {
 
-            commandAlreadySent = true;
+            // User only said "Hey KAURA".
 
-            stopRecognition();
+            waitingForCommand = true;
 
-            sendMessage(transcript, true);
+            resetWakeAfterSpeech = false;
+
+            speak(
+                "Yes, I'm listening. What can I do for you?"
+            );
 
         }
+
     };
+
+
+    // SPEECH ERROR
 
     r.onerror = (event) => {
 
+        if (recognition !== r) return;
+
         console.error(
-            "KAURA speech error:",
+            "KAURA speech recognition error:",
             event.error
         );
 
+        const errors = {
+
+            "not-allowed":
+                "Microphone permission denied. Allow microphone access.",
+
+            "service-not-allowed":
+                "Browser speech recognition service is blocked.",
+
+            "no-speech":
+                "I couldn't hear you. Please speak again.",
+
+            "network":
+                "Speech recognition network error. Check your internet.",
+
+            "audio-capture":
+                "No microphone detected.",
+
+            "language-not-supported":
+                "English recognition is unavailable.",
+
+            "aborted":
+                "Speech recognition interrupted."
+
+        };
+
         setStatus(
-            "Speech error: " + event.error
+            errors[event.error] ||
+            "Speech recognition error: " + event.error
         );
 
     };
 
+
+    // SESSION ENDED
+
     r.onend = () => {
 
+        console.log("KAURA recognition session ended.");
+
         if (recognition === r) {
+
             recognition = null;
+
+            scheduleRecognitionRestart();
+
         }
 
-        scheduleRecognitionRestart();
-
     };
+
+
+    // START
 
     try {
 
@@ -335,12 +582,18 @@ function startRecognition() {
     } catch (error) {
 
         if (recognition === r) {
+
             recognition = null;
+
         }
 
         console.error(
             "Recognition start failed:",
             error
+        );
+
+        setStatus(
+            "Could not start microphone recognition. Please retry."
         );
 
         scheduleRecognitionRestart();
@@ -349,6 +602,10 @@ function startRecognition() {
 
 }
 
+
+// =========================================
+// STOP CURRENT RECOGNITION SESSION
+// =========================================
 
 function stopRecognition() {
 
@@ -358,74 +615,90 @@ function stopRecognition() {
 
     const old = recognition;
 
-    recognition = null;
+    // Detach the session before stopping it.
+    // Its onend event will not start another session.
 
-    old.onend = null;
+    recognition = null;
 
     try {
 
         old.stop();
 
-    } catch (_) {}
+    } catch (error) {
+
+        console.warn(
+            "Recognition stop:",
+            error.message
+        );
+
+    }
 
 }
 
 
-async function enableListening() {
+// =========================================
+// ENABLE LISTENING
+// =========================================
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-
-        setStatus(
-            "Microphone requires HTTPS (or localhost)."
-        );
-
-        return;
-
-    }
+function enableListening() {
 
     if (!SpeechRecognition) {
 
         setStatus(
-            "This browser does not support speech recognition. Try Chrome on desktop or Android."
+            "Speech recognition is not supported. Please use Chrome."
         );
 
         return;
 
     }
 
-    try {
+    if (listeningEnabled) {
 
-        const stream =
-            await navigator.mediaDevices.getUserMedia({
-                audio: true
-            });
-
-        stream.getTracks().forEach(
-            (track) => track.stop()
-        );
-
-        listeningEnabled = true;
-
-        updateControls();
-
-        startRecognition();
-
-    } catch (err) {
-
-        console.error(err);
-
-        setStatus(
-            "Microphone permission denied. Allow it in your browser settings."
-        );
+        return;
 
     }
+
+    if (!window.isSecureContext) {
+
+        setStatus(
+            "Microphone requires HTTPS or localhost."
+        );
+
+        return;
+
+    }
+
+    // Do not await getUserMedia here.
+    // Start recognition directly from the button click.
+
+    listeningEnabled = true;
+
+    waitingForCommand = false;
+
+    resetWakeAfterSpeech = false;
+
+    updateControls();
+
+    setStatus("Starting KAURA microphone...");
+
+    startRecognition();
 
 }
 
 
+// =========================================
+// STOP ALL LISTENING
+// =========================================
+
 function stopListening() {
 
     listeningEnabled = false;
+
+    waitingForCommand = false;
+
+    resetWakeAfterSpeech = false;
+
+    clearTimeout(restartTimer);
 
     stopRecognition();
 
@@ -437,12 +710,18 @@ function stopListening() {
 
     speaking = false;
 
+    busy = false;
+
     setOrb("");
 
     updateControls();
 
 }
 
+
+// =========================================
+// UPDATE BUTTONS
+// =========================================
 
 function updateControls() {
 
@@ -454,7 +733,7 @@ function updateControls() {
         );
 
         micButton.textContent =
-            listeningEnabled
+            listeningEnabled && mode === "wake"
                 ? "■ Stop Hey KAURA"
                 : "🎙 Activate Hey KAURA";
 
@@ -506,6 +785,10 @@ function updateControls() {
 }
 
 
+// =========================================
+// SEND MESSAGE TO GEMINI
+// =========================================
+
 async function sendMessage(rawText, shouldSpeak = false) {
 
     const text = String(rawText || "").trim();
@@ -550,7 +833,8 @@ async function sendMessage(rawText, shouldSpeak = false) {
         if (!response.ok) {
 
             throw new Error(
-                data.error || `Server error ${response.status}`
+                data.error ||
+                `Server error ${response.status}`
             );
 
         }
@@ -594,10 +878,13 @@ async function sendMessage(rawText, shouldSpeak = false) {
             err
         );
 
+        // Remove the failed user message from history.
+
         conversation.pop();
 
         const message =
-            err.message || "Could not reach the server.";
+            err.message ||
+            "Could not reach the server.";
 
         addMessage(
             "assistant",
@@ -608,8 +895,14 @@ async function sendMessage(rawText, shouldSpeak = false) {
 
         setOrb("");
 
-        if (listeningEnabled) {
-            scheduleRecognitionRestart();
+        // Reset wake phrase state after a failed command.
+
+        if (mode === "wake") {
+
+            waitingForCommand = false;
+
+            resetWakeAfterSpeech = false;
+
         }
 
     } finally {
@@ -617,7 +910,9 @@ async function sendMessage(rawText, shouldSpeak = false) {
         busy = false;
 
         if (listeningEnabled && !speaking) {
+
             scheduleRecognitionRestart();
+
         }
 
     }
@@ -625,7 +920,9 @@ async function sendMessage(rawText, shouldSpeak = false) {
 }
 
 
-// Typed chat
+// =========================================
+// TYPED CHAT
+// =========================================
 
 if (chatForm) {
 
@@ -650,7 +947,9 @@ if (chatForm) {
 }
 
 
-// Quick prompts
+// =========================================
+// QUICK PROMPTS
+// =========================================
 
 document.querySelectorAll("[data-prompt]").forEach(
     (button) => {
@@ -661,7 +960,9 @@ document.querySelectorAll("[data-prompt]").forEach(
                 button.dataset.prompt || "";
 
             if (messageInput) {
+
                 messageInput.value = prompt;
+
             }
 
             sendMessage(prompt, false);
@@ -672,7 +973,9 @@ document.querySelectorAll("[data-prompt]").forEach(
 );
 
 
-// Hey KAURA button
+// =========================================
+// HEY KAURA BUTTON
+// =========================================
 
 if (micButton) {
 
@@ -697,7 +1000,9 @@ if (micButton) {
 }
 
 
-// Voice conversation button
+// =========================================
+// VOICE CONVERSATION BUTTON
+// =========================================
 
 if (liveButton) {
 
@@ -712,7 +1017,9 @@ if (liveButton) {
 }
 
 
-// Stop conversation
+// =========================================
+// STOP CONVERSATION BUTTON
+// =========================================
 
 if (stopButton) {
 
@@ -727,14 +1034,18 @@ if (stopButton) {
 }
 
 
-// Mode selection
+// =========================================
+// MODE SELECTION
+// =========================================
 
 wakeModeButton?.addEventListener(
     "click",
     () => {
 
         if (listeningEnabled) {
+
             stopListening();
+
         }
 
         mode = "wake";
@@ -754,7 +1065,9 @@ liveModeButton?.addEventListener(
     () => {
 
         if (listeningEnabled) {
+
             stopListening();
+
         }
 
         mode = "conversation";
@@ -769,7 +1082,9 @@ liveModeButton?.addEventListener(
 );
 
 
-// Clear chat
+// =========================================
+// CLEAR CHAT
+// =========================================
 
 if (clearButton) {
 
@@ -793,17 +1108,31 @@ if (clearButton) {
         }
 
         if ("speechSynthesis" in window) {
+
             window.speechSynthesis.cancel();
+
         }
 
+        speaking = false;
+
         setStatus("Conversation cleared.");
+
+        setOrb("");
+
+        if (listeningEnabled) {
+
+            scheduleRecognitionRestart();
+
+        }
 
     });
 
 }
 
 
-// Stop listening when page is hidden
+// =========================================
+// PAGE VISIBILITY
+// =========================================
 
 document.addEventListener(
     "visibilitychange",
@@ -823,11 +1152,19 @@ document.addEventListener(
 );
 
 
+// =========================================
+// PAGE CLEANUP
+// =========================================
+
 window.addEventListener(
     "pagehide",
     stopListening
 );
 
+
+// =========================================
+// INITIALIZE KAURA
+// =========================================
 
 updateControls();
 
@@ -836,5 +1173,5 @@ setStatus(
 );
 
 console.log(
-    "KAURA Gemini assistant ready."
+    "KAURA Gemini voice assistant ready."
 );
