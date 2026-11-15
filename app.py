@@ -53,7 +53,7 @@ def serve_css():
 
 @app.route("/script.js")
 def serve_js():
-    return send_from_directory("templates", "../script.js")
+    return send_from_directory("public", "script.js")
 
 
 @app.route("/health")
@@ -66,6 +66,9 @@ def health():
         "model": GEMINI_MODEL
     })
 
+@app.route("/stt-test")
+def speech_test():
+    return render_template("stt-test.html")
 
 @app.route("/ask", methods=["POST"])
 def ask():

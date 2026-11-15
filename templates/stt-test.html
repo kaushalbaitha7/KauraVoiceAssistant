@@ -1,0 +1,153 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KAURA Speech Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #fdf5eb;
+            color: #263b32;
+            padding: 25px;
+            text-align: center;
+        }
+
+        button {
+            padding: 16px 25px;
+            background: #547c61;
+            color: white;
+            border: 0;
+            border-radius: 12px;
+            font-size: 17px;
+        }
+
+        #status, #result, #logs {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            overflow-wrap: anywhere;
+        }
+
+        #result {
+            min-height: 50px;
+            font-size: 20px;
+        }
+
+        #logs {
+            text-align: left;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>KAURA Voice Diagnostic</h1>
+
+    <p>Tap the button and speak a sentence.</p>
+
+    <button id="start">Start Speech Test</button>
+
+    <div id="status">Waiting to start...</div>
+
+    <h3>Recognized text:</h3>
+    <div id="result">Your speech will appear here.</div>
+
+    <h3>Diagnostic logs:</h3>
+    <div id="logs"></div>
+
+<script>
+const statusBox = document.getElementById("status");
+const resultBox = document.getElementById("result");
+const logsBox = document.getElementById("logs");
+
+function log(message) {
+    console.log(message);
+    logsBox.textContent += message + "\n";
+}
+
+const Recognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+log("Browser: " + navigator.userAgent);
+log("Recognition API: " + Boolean(Recognition));
+
+if (!Recognition) {
+    statusBox.textContent =
+        "Speech Recognition API NOT SUPPORTED";
+} else {
+
+    const recognition = new Recognition();
+
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+        statusBox.textContent = "Microphone started. Speak now.";
+        log("EVENT: onstart");
+    };
+
+    recognition.onaudiostart = () => {
+        log("EVENT: onaudiostart");
+    };
+
+    recognition.onsoundstart = () => {
+        log("EVENT: onsoundstart");
+    };
+
+    recognition.onspeechstart = () => {
+        log("EVENT: onspeechstart");
+    };
+
+    recognition.onresult = (event) => {
+
+        let text = "";
+
+        for (let i = event.resultIndex;
+             i < event.results.length; i++) {
+
+            text += event.results[i][0].transcript + " ";
+
+        }
+
+        resultBox.textContent = text;
+
+        log("TRANSCRIPT: " + text);
+    };
+
+    recognition.onerror = (event) => {
+        statusBox.textContent =
+            "Recognition error: " + event.error;
+
+        log("ERROR: " + event.error);
+    };
+
+    recognition.onend = () => {
+        log("EVENT: onend");
+        statusBox.textContent += " | Recognition ended.";
+    };
+
+    document.getElementById("start").onclick = () => {
+
+        resultBox.textContent = "Listening...";
+
+        logsBox.textContent = "";
+
+        try {
+            recognition.start();
+            statusBox.textContent = "Starting...";
+        } catch (error) {
+            log("START ERROR: " + error.message);
+            statusBox.textContent = error.message;
+        }
+    };
+}
+</script>
+
+</body>
+</html>
