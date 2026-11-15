@@ -1,294 +1,179 @@
 
+import os
+import logging
+
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
-from datetime import datetime
-from urllib.parse import quote_plus
-
-import ast
-import operator
-import re
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, static_folder=None)
 
-# ==========================================
-# SAFE ARITHMETIC CALCULATOR
-# ==========================================
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
-OPERATORS = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.Pow: operator.pow,
-    ast.Mod: operator.mod,
-    ast.USub: operator.neg,
-    ast.UAdd: operator.pos
-}
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-def safe_calculate(expression):
+KAURA_SYSTEM_INSTRUCTION = """
+You are KAURA, a warm, capable, helpful personal voice assistant.
 
-    expression = expression.lower()
+Speak naturally, like a thoughtful assistant. Be friendly, respectful,
+clear and practical.
 
-    expression = expression.replace("×", "*")
-    expression = expression.replace("÷", "/")
+Your first response to a greeting should greet the user and ask how
+you can help.
 
-    expression = expression.replace("plus", "+")
-    expression = expression.replace("minus", "-")
+Understand normal conversational language and follow-up questions.
 
-    expression = expression.replace("multiplied by", "*")
-    expression = expression.replace("times", "*")
+Help with programming, engineering, study, career planning,
+technology, entertainment and general knowledge.
 
-    expression = expression.replace("divided by", "/")
+Explain step by step when asked.
 
-    # Remove unsupported characters
+For voice responses, be concise unless the user asks for detail.
 
-    expression = re.sub(
-        r"[^0-9.+\-*/()% ]",
-        "",
-        expression
-    ).strip()
+Never claim you performed an action you did not perform.
 
-    if not expression:
-        raise ValueError("No calculation found")
+Your name is KAURA.
+"""
 
-    tree = ast.parse(expression, mode="eval")
-
-    def evaluate(node):
-
-        if isinstance(node, ast.Expression):
-
-            return evaluate(node.body)
-
-        if isinstance(node, ast.Constant) and isinstance(
-            node.value, (int, float)
-        ):
-
-            return node.value
-
-        if isinstance(node, ast.BinOp) and type(node.op) in OPERATORS:
-
-            left = evaluate(node.left)
-
-            right = evaluate(node.right)
-
-            if isinstance(node.op, ast.Pow) and abs(right) > 8:
-
-                raise ValueError("Power is too large")
-
-            return OPERATORS[type(node.op)](left, right)
-
-        if isinstance(node, ast.UnaryOp) and type(node.op) in OPERATORS:
-
-            return OPERATORS[type(node.op)](
-                evaluate(node.operand)
-            )
-
-        raise ValueError("Unsupported calculation")
-
-    result = evaluate(tree)
-
-    if isinstance(result, float) and result.is_integer():
-
-        return int(result)
-
-    return round(result, 6) if isinstance(result, float) else result
-
-# ==========================================
-# ASSISTANT RESPONSE ENGINE
-# ==========================================
-
-
-def assistant_reply(message):
-
-    text = message.strip()
-    q = text.lower()
-    now = datetime.now()
-
-    if not text:
-        return "I didn't catch that. Please type or say something."
-
-    # GREETINGS
-    if any(word in q for word in [
-        "hello", "hi", "hey", "good morning", "good evening"
-    ]):
-        return "Hello! I'm Kaura, your Python voice assistant. How can I help you today?"
-
-    # IDENTITY
-    if "your name" in q or "who are you" in q:
-        return "I'm Kaura, a voice assistant built with Python Flask, HTML, CSS and browser speech technology."
-
-    # CALCULATOR - CHECK BEFORE TIME
-    if (
-        q.startswith("calculate ")
-        or q.startswith("what is ")
-        or q.startswith("solve ")
-    ):
-        candidate = re.sub(
-            r"^(calculate|what is|solve)\s+",
-            "",
-            q
-        )
-
-        try:
-            answer = safe_calculate(candidate)
-            return f"The answer is {answer}."
-        except Exception:
-            pass
-
-    # TIME - MATCH THE COMPLETE WORD
-    if re.search(r"\btime\b", q):
-        return f"The current time is {now.strftime('%I:%M %p')}."
-
-    # DATE
-    if "date" in q or "today" in q or "day is it" in q:
-        return f"Today is {now.strftime('%A, %d %B %Y')}."
-
-    # GENERAL CONVERSATION
-    if "how are you" in q:
-        return "I'm functioning perfectly and ready to assist you. Thank you for asking!"
-
-    if "thank" in q:
-        return "You're welcome! It's my pleasure to help."
-
-    # HELP
-    if "help" in q or "what can you do" in q:
-        return (
-            "I can tell you the time and date, greet you, solve basic "
-            "arithmetic, open popular websites and search the internet. "
-            "Try asking for the time or calculating 25 times 4."
-        )
-
-    # WEBSITE COMMANDS
-    if "open youtube" in q:
-        return "Opening YouTube for you."
-
-    if "open google" in q:
-        return "Opening Google for you."
-
-    if "open github" in q:
-        return "Opening GitHub for you."
-
-    if "open wikipedia" in q:
-        return "Opening Wikipedia for you."
-
-    # GOOGLE SEARCH
-    if q.startswith("search for ") or q.startswith("search "):
-        return "I'll open a web search for that."
-
-    # DEFAULT RESPONSE
-    return (
-        "I heard you say: " + text +
-        ". I'm still learning that skill. Try asking for the time, "
-        "date, a calculation, or say 'help' to see my commands."
-    )
-# ==========================================
-# WEBSITE ROUTES
-# ==========================================
 
 @app.route("/")
 def home():
-
     return render_template("index.html")
 
-# Serve CSS
 
 @app.route("/style.css")
 def serve_css():
-
     return send_from_directory("public", "style.css")
 
-# Serve JavaScript
 
 @app.route("/script.js")
 def serve_js():
+    return send_from_directory("templates", "../script.js")
 
-    return send_from_directory("public", "script.js")
 
-# ==========================================
-# ASSISTANT API
-# ==========================================
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "online",
+        "assistant": "KAURA",
+        "provider": "Google Gemini" if client else "Browser-only fallback",
+        "api_configured": bool(client),
+        "model": GEMINI_MODEL
+    })
+
 
 @app.route("/ask", methods=["POST"])
 def ask():
 
     data = request.get_json(silent=True) or {}
 
-    message = data.get("message", "")
+    messages = data.get("messages")
 
-    if not isinstance(message, str):
+    if messages is None:
+        message = data.get("message", "")
+        messages = [
+            {"role": "user", "content": message}
+        ]
 
+    if not isinstance(messages, list) or not messages:
         return jsonify({
-            "reply": "Please send a valid text message.",
-            "action": None
+            "success": False,
+            "error": "Please enter a message."
         }), 400
 
-    reply = assistant_reply(message)
+    history = []
 
-    q = message.strip().lower()
+    for item in messages[-16:]:
 
-    action = None
+        if not isinstance(item, dict):
+            continue
 
-    # OPEN YOUTUBE
+        role = item.get("role")
+        content = item.get("content")
 
-    if "open youtube" in q:
+        if role not in ("user", "assistant"):
+            continue
 
-        action = {
-            "type": "open",
-            "url": "https://www.youtube.com"
-        }
+        if not isinstance(content, str):
+            continue
 
-    # OPEN GOOGLE
+        content = content.strip()
 
-    elif "open google" in q:
+        if not content:
+            continue
 
-        action = {
-            "type": "open",
-            "url": "https://www.google.com"
-        }
-
-    # OPEN GITHUB
-
-    elif "open github" in q:
-
-        action = {
-            "type": "open",
-            "url": "https://github.com"
-        }
-
-    # OPEN WIKIPEDIA
-
-    elif "open wikipedia" in q:
-
-        action = {
-            "type": "open",
-            "url": "https://www.wikipedia.org"
-        }
-
-    # GOOGLE SEARCH
-
-    elif q.startswith("search for ") or q.startswith("search "):
-
-        term = re.sub(
-            r"^search( for)?\s+",
-            "",
-            message.strip(),
-            flags=re.I
+        history.append(
+            types.Content(
+                role="user" if role == "user" else "model",
+                parts=[
+                    types.Part.from_text(
+                        text=content[:5000]
+                    )
+                ]
+            )
         )
 
-        action = {
-            "type": "open",
-            "url": "https://www.google.com/search?q=" + quote_plus(term)
-        }
+    if not history or history[-1].role != "user":
+        return jsonify({
+            "success": False,
+            "error": "The last message must be from the user."
+        }), 400
 
+    if not client:
+        return jsonify({
+            "success": False,
+            "error": "Gemini API key is not configured. Add GEMINI_API_KEY to your .env file."
+        }), 503
+
+    try:
+
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=history,
+            config=types.GenerateContentConfig(
+                system_instruction=KAURA_SYSTEM_INSTRUCTION,
+                temperature=0.7,
+                max_output_tokens=900
+            )
+        )
+
+        answer = (response.text or "").strip()
+
+        if not answer:
+            answer = "I'm here with you. Could you say that another way?"
+
+        return jsonify({
+            "success": True,
+            "reply": answer,
+            "response": answer
+        })
+
+    except Exception:
+
+        logging.exception("Gemini request failed")
+
+        return jsonify({
+            "success": False,
+            "error": "Gemini could not answer right now. Check your API key, model access, quota and server terminal."
+        }), 502
+
+
+@app.errorhandler(404)
+def not_found(_error):
     return jsonify({
-        "reply": reply,
-        "action": action
-    })
+        "error": "Route not found."
+    }), 404
 
-# ==========================================
-# RUN APPLICATION
-# ==========================================
 
 if __name__ == "__main__":
 
-    app.run(debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False
+    )

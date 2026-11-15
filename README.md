@@ -1,74 +1,75 @@
-# Kaura — Python Voice Assistant
 
-A mini-project built with Python Flask, HTML, CSS and JavaScript browser speech APIs.
+# KAURA Gemini Voice Assistant
 
 ## Features
-- Voice input through the browser microphone (Web Speech API)
-- Text input through the chat box
-- Spoken responses through browser speech synthesis
-- Time and date responses
-- Basic arithmetic calculations
-- Open YouTube, Google, GitHub and Wikipedia
-- Google search command
-- Responsive dark interface
+
+- Gemini-powered AI chat
+- Browser speech-to-text
+- Browser text-to-speech
+- Hey KAURA wake phrase mode
+- Voice conversation mode
+- Responsive laptop and mobile interface
+- Conversation history during the current session
 
 ## Requirements
-- Python 3.9+
+
+- Python 3.10 or newer
+- Google Gemini API key
 - Google Chrome or Microsoft Edge recommended
-- Microphone permission for voice input
 
-## Run on Windows
-1. Extract the ZIP file.
-2. Open the project folder in VS Code.
-3. Open the terminal and create a virtual environment:
+## Installation
 
-   `python -m venv venv`
+### Step 1: Create virtual environment
 
-4. Activate it:
+python -m venv .venv
 
-   `venv\\Scripts\\activate`
+### Step 2: Activate environment
 
-5. Install dependencies:
+Windows PowerShell:
 
-   `pip install -r requirements.txt`
+.venv\Scripts\Activate.ps1
 
-6. Start the Flask server:
+### Step 3: Install dependencies
 
-   `python app.py`
+python -m pip install -r requirements.txt
 
-7. Open this address in Chrome:
+### Step 4: Configure API key
 
-   `http://127.0.0.1:5000`
+Copy .env.example to .env.
 
-## Run on macOS / Linux
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+Add your Gemini API key:
+
+GEMINI_API_KEY=your_key_here
+
+GEMINI_MODEL=gemini-2.5-flash
+
+### Step 5: Start application
+
 python app.py
-```
 
-Then visit `http://127.0.0.1:5000`.
+### Step 6: Open application
 
-## Demo commands
-- Hello Kaura
-- What time is it?
-- What is today's date?
-- Calculate 25 times 4
-- Calculate (50 + 20) / 2
-- Open YouTube
-- Open GitHub
-- Search for artificial intelligence
+http://127.0.0.1:5000
 
-## How it works
-1. The browser captures speech and converts it into text using Web Speech API.
-2. JavaScript sends the text to Flask using a POST request at `/ask`.
-3. Python processes the command and returns a JSON response.
-4. JavaScript displays the response and reads it aloud using SpeechSynthesis.
+## Deployment
 
-## Important notes
-- Speech recognition support depends on the browser. Use a current version of Chrome or Edge and allow microphone access.
-- Speech synthesis uses voices available on the user's device.
-- Voice input and voice output are handled by browser APIs; Flask handles the assistant's command logic.
-- This is an educational rule-based assistant, not a large language model. It does not understand every open-ended question.
-- For a classroom demo, run it locally on `127.0.0.1`. Do not expose Flask debug mode to a public network.
+Configure these environment variables on your hosting platform:
+
+GEMINI_API_KEY
+
+GEMINI_MODEL
+
+Do not upload your .env file.
+
+Use HTTPS for microphone access on deployed websites.
+
+## Important Notes
+
+- Gemini free-tier quotas and model availability can change.
+- The browser must remain open and active for wake-word listening.
+- This is not an always-on operating-system assistant.
+- Chrome and Edge generally provide the best speech-recognition support.
+- Microphone permission is required.
+- Browser speech recognition may use the browser vendor's speech service.
+- Voice conversation mode uses browser speech recognition and Gemini text responses. It is not Gemini Live audio.
+- Avoid sending confidential information through free-tier API services.
