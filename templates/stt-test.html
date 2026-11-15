@@ -455,7 +455,7 @@ function createRecognition() {
 
     r.lang = languageSelect.value;
 
-    r.continuous = false;
+    r.continuous = true;
 
     r.interimResults = true;
 
@@ -756,35 +756,17 @@ function startTest() {
 
 function stopTest() {
 
-    clearTimeout(startTimer);
-
     if (!recognition) return;
 
     const current = recognition;
 
     log("Stopping recognition...");
 
-    recognition = null;
-
-    isRunning = false;
-
-    isStarting = false;
-
-    startButton.disabled = false;
-
-    stopButton.disabled = true;
-
     try {
-
         current.stop();
-
     } catch (error) {
-
         log("STOP ERROR: " + error.message);
-
     }
-
-    setStatus("Recognition stopped.");
 
 }
 
