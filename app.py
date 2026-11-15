@@ -66,10 +66,6 @@ def health():
         "model": GEMINI_MODEL
     })
 
-@app.route("/stt-test")
-def speech_test():
-    return render_template("stt-test.html")
-
 @app.route("/ask", methods=["POST"])
 def ask():
 
