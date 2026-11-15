@@ -1,4 +1,3 @@
-
 import os
 import logging
 
@@ -6,10 +5,6 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
-# -----------------------------------------
-# CONFIGURATION
-# -----------------------------------------
 
 load_dotenv()
 
@@ -54,33 +49,17 @@ Never claim you performed an action you did not perform.
 Your name is KAURA.
 """
 
-# -----------------------------------------
-# WEBSITE
-# -----------------------------------------
-
 @app.route("/")
 def home():
     return render_template("index.html")
-
-# -----------------------------------------
-# CSS
-# -----------------------------------------
 
 @app.route("/style.css")
 def serve_css():
     return send_from_directory("public", "style.css")
 
-# -----------------------------------------
-# JAVASCRIPT
-# -----------------------------------------
-
 @app.route("/script.js")
 def serve_js():
     return send_from_directory("public", "script.js")
-
-# -----------------------------------------
-# HEALTH CHECK
-# -----------------------------------------
 
 @app.route("/health")
 def health():
@@ -91,10 +70,6 @@ def health():
         "api_configured": bool(client),
         "model": GEMINI_MODEL
     })
-
-# -----------------------------------------
-# GEMINI CHAT API
-# -----------------------------------------
 
 @app.route("/ask", methods=["POST"])
 def ask():
@@ -199,9 +174,6 @@ def ask():
             "error": "Gemini could not answer right now. Check API key, model access, quota and server logs."
         }), 502
 
-# -----------------------------------------
-# 404 ERROR
-# -----------------------------------------
 
 @app.errorhandler(404)
 def not_found(_error):
@@ -209,10 +181,6 @@ def not_found(_error):
     return jsonify({
         "error": "Route not found."
     }), 404
-
-# -----------------------------------------
-# START SERVER
-# -----------------------------------------
 
 if __name__ == "__main__":
 

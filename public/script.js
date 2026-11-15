@@ -1,25 +1,6 @@
 
 "use strict";
 
-/* =========================================
-   KAURA AI - VOICE ASSISTANT
-
-   FIRST CLICK:
-   Start continuous listening.
-
-   SECOND CLICK:
-   Stop recording, send complete transcript
-   to Gemini, and speak the answer.
-
-   No wake phrase.
-   No automatic recording stop.
-========================================= */
-
-
-// -----------------------------------------
-// DOM ELEMENTS
-// -----------------------------------------
-
 const $ = (id) => document.getElementById(id);
 
 const chatLog = $("chatLog");
@@ -33,18 +14,10 @@ const clearButton = $("clearButton");
 const assistantOrb = $("assistantOrb");
 
 
-// -----------------------------------------
-// SPEECH RECOGNITION SUPPORT
-// -----------------------------------------
-
 const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
 
-
-// -----------------------------------------
-// APPLICATION STATE
-// -----------------------------------------
 
 let conversation = [];
 
@@ -67,10 +40,6 @@ let stopRequested = false;
 let responseStarted = false;
 
 
-// -----------------------------------------
-// STATUS
-// -----------------------------------------
-
 function setStatus(message) {
 
     if (micStatus) {
@@ -78,11 +47,6 @@ function setStatus(message) {
     }
 
 }
-
-
-// -----------------------------------------
-// ORB ANIMATION
-// -----------------------------------------
 
 function setOrb(state = "") {
 
@@ -101,10 +65,6 @@ function setOrb(state = "") {
 }
 
 
-// -----------------------------------------
-// UPDATE MICROPHONE BUTTON
-// -----------------------------------------
-
 function updateControls() {
 
     if (!micButton) return;
@@ -119,10 +79,6 @@ function updateControls() {
 
 }
 
-
-// -----------------------------------------
-// DISPLAY CHAT MESSAGE
-// -----------------------------------------
 
 function addMessage(role, text) {
 
@@ -163,11 +119,6 @@ function addMessage(role, text) {
     chatLog.scrollTop = chatLog.scrollHeight;
 
 }
-
-
-// -----------------------------------------
-// TEXT TO SPEECH
-// -----------------------------------------
 
 function speak(text) {
 
@@ -249,11 +200,6 @@ function speak(text) {
 
 }
 
-
-// -----------------------------------------
-// CREATE RECOGNITION
-// -----------------------------------------
-
 function createRecognition() {
 
     if (!SpeechRecognition) {
@@ -270,10 +216,8 @@ function createRecognition() {
 
     r.lang = "en-IN";
 
-    // Keep listening until the user clicks Stop.
     r.continuous = true;
 
-    // Display words while the user is speaking.
     r.interimResults = true;
 
     r.maxAlternatives = 1;
@@ -281,11 +225,6 @@ function createRecognition() {
     return r;
 
 }
-
-
-// -----------------------------------------
-// START RECOGNITION SESSION
-// -----------------------------------------
 
 function startRecognition() {
 
@@ -319,10 +258,6 @@ function startRecognition() {
 
     };
 
-
-    // -------------------------------------
-    // LIVE SPEECH TRANSCRIPTION
-    // -------------------------------------
 
     r.onresult = (event) => {
 
@@ -379,11 +314,6 @@ function startRecognition() {
 
     };
 
-
-    // -------------------------------------
-    // RECOGNITION ERRORS
-    // -------------------------------------
-
     r.onerror = (event) => {
 
         console.error(
@@ -427,16 +357,7 @@ function startRecognition() {
             setStatus(errors[event.error]);
 
         }
-
-        // no-speech is not fatal:
-        // the user may simply be pausing.
-
     };
-
-
-    // -------------------------------------
-    // SESSION ENDED
-    // -------------------------------------
 
     r.onend = () => {
 
@@ -448,9 +369,6 @@ function startRecognition() {
 
         }
 
-        // If the user clicked Stop,
-        // process the complete transcript.
-
         if (stopRequested) {
 
             processCollectedSpeech();
@@ -459,10 +377,6 @@ function startRecognition() {
 
         }
 
-        // Otherwise keep listening.
-        // Chrome may end a recognition session
-        // even when continuous mode is enabled.
-
         if (listeningEnabled) {
 
             scheduleRecognitionRestart();
@@ -470,11 +384,6 @@ function startRecognition() {
         }
 
     };
-
-
-    // -------------------------------------
-    // START
-    // -------------------------------------
 
     try {
 
@@ -501,11 +410,6 @@ function startRecognition() {
 
 }
 
-
-// -----------------------------------------
-// RESTART IF CHROME ENDS A SESSION
-// -----------------------------------------
-
 function scheduleRecognitionRestart() {
 
     clearTimeout(restartTimer);
@@ -528,11 +432,6 @@ function scheduleRecognitionRestart() {
     }, 700);
 
 }
-
-
-// -----------------------------------------
-// START LISTENING
-// -----------------------------------------
 
 function startListening() {
 
@@ -578,16 +477,9 @@ function startListening() {
 
 }
 
-
-// -----------------------------------------
-// STOP LISTENING
-// -----------------------------------------
-
 function stopListening() {
 
     if (!listeningEnabled) return;
-
-    // Do not restart recognition after this point.
 
     listeningEnabled = false;
 
@@ -606,9 +498,6 @@ function stopListening() {
         const current = recognition;
 
         try {
-
-            // stop() allows final recognition results
-            // to arrive before onend.
 
             current.stop();
 
@@ -634,11 +523,6 @@ function stopListening() {
     }
 
 }
-
-
-// -----------------------------------------
-// PROCESS COMPLETE SPEECH
-// -----------------------------------------
 
 async function processCollectedSpeech() {
 
@@ -678,16 +562,9 @@ async function processCollectedSpeech() {
         completeText
     );
 
-    // Send the entire recording as one question.
-
     await sendMessage(completeText, true);
 
 }
-
-
-// -----------------------------------------
-// SEND MESSAGE TO GEMINI
-// -----------------------------------------
 
 async function sendMessage(rawText, shouldSpeak = false) {
 
@@ -808,26 +685,15 @@ async function sendMessage(rawText, shouldSpeak = false) {
 
 }
 
-
-// -----------------------------------------
-// MICROPHONE BUTTON
-// -----------------------------------------
-
 if (micButton) {
 
     micButton.addEventListener("click", () => {
 
         if (listeningEnabled) {
 
-            // Second click:
-            // Stop recording and get the answer.
-
             stopListening();
 
         } else {
-
-            // First click:
-            // Start continuous recording.
 
             startListening();
 
@@ -837,11 +703,6 @@ if (micButton) {
 
 }
 
-
-
-// -----------------------------------------
-// TYPED CHAT
-// -----------------------------------------
 
 if (chatForm) {
 
@@ -858,24 +719,18 @@ if (chatForm) {
 
             messageInput.value = "";
 
-            // Stop any active recording before typed chat.
+            
             if (listeningEnabled) {
                 stopListening();
             }
 
-            // true = KAURA speaks the answer aloud.
+            
             await sendMessage(text, true);
 
         }
     );
 
 }
-
-
-
-// -----------------------------------------
-// QUICK PROMPTS
-// -----------------------------------------
 
 document.querySelectorAll("[data-prompt]").forEach(
     (button) => {
@@ -896,10 +751,6 @@ document.querySelectorAll("[data-prompt]").forEach(
     }
 );
 
-
-// -----------------------------------------
-// CLEAR CHAT
-// -----------------------------------------
 
 if (clearButton) {
 
@@ -970,11 +821,6 @@ if (clearButton) {
 
 }
 
-
-// -----------------------------------------
-// PAGE VISIBILITY
-// -----------------------------------------
-
 document.addEventListener(
     "visibilitychange",
     () => {
@@ -987,11 +833,6 @@ document.addEventListener(
 
     }
 );
-
-
-// -----------------------------------------
-// PAGE CLEANUP
-// -----------------------------------------
 
 window.addEventListener(
     "pagehide",
@@ -1015,11 +856,6 @@ window.addEventListener(
 
     }
 );
-
-
-// -----------------------------------------
-// INITIALIZE KAURA
-// -----------------------------------------
 
 updateControls();
 
