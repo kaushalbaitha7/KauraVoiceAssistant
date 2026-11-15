@@ -2,11 +2,23 @@
 "use strict";
 
 /* =========================================
-   KAURA AI - GEMINI VOICE ASSISTANT
-   Speech recognition + wake phrase + TTS
+   KAURA AI - VOICE ASSISTANT
+
+   FIRST CLICK:
+   Start continuous listening.
+
+   SECOND CLICK:
+   Stop recording, send complete transcript
+   to Gemini, and speak the answer.
+
+   No wake phrase.
+   No automatic recording stop.
 ========================================= */
 
+
+// -----------------------------------------
 // DOM ELEMENTS
+// -----------------------------------------
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,30 +29,24 @@ const messageInput = $("messageInput");
 const micButton = $("micButton");
 const micStatus = $("micStatus");
 
-const wakeModeButton = $("wakeModeButton");
-const liveModeButton = $("liveModeButton");
-
-const liveButton = $("liveButton");
-const stopButton = $("stopButton");
-
 const clearButton = $("clearButton");
 const assistantOrb = $("assistantOrb");
 
 
+// -----------------------------------------
 // SPEECH RECOGNITION SUPPORT
+// -----------------------------------------
 
 const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
 
 
-// =========================================
+// -----------------------------------------
 // APPLICATION STATE
-// =========================================
+// -----------------------------------------
 
 let conversation = [];
-
-let mode = "wake";
 
 let listeningEnabled = false;
 
@@ -50,31 +56,33 @@ let busy = false;
 
 let speaking = false;
 
+let finalTranscript = "";
+
+let interimTranscript = "";
+
 let restartTimer = null;
 
-let commandAlreadySent = false;
+let stopRequested = false;
 
-// In wake mode, this becomes true after KAURA hears
-// its wake phrase and asks the user for a command.
-let waitingForCommand = false;
-
-// Reset wake phrase state after KAURA finishes
-// speaking an answer to a command.
-let resetWakeAfterSpeech = false;
+let responseStarted = false;
 
 
-// =========================================
-// STATUS AND ORB
-// =========================================
+// -----------------------------------------
+// STATUS
+// -----------------------------------------
 
-function setStatus(text) {
+function setStatus(message) {
 
     if (micStatus) {
-        micStatus.textContent = text;
+        micStatus.textContent = message;
     }
 
 }
 
+
+// -----------------------------------------
+// ORB ANIMATION
+// -----------------------------------------
 
 function setOrb(state = "") {
 
@@ -93,9 +101,28 @@ function setOrb(state = "") {
 }
 
 
-// =========================================
-// CHAT MESSAGE DISPLAY
-// =========================================
+// -----------------------------------------
+// UPDATE MICROPHONE BUTTON
+// -----------------------------------------
+
+function updateControls() {
+
+    if (!micButton) return;
+
+    micButton.classList.remove("hidden");
+
+    micButton.textContent = listeningEnabled
+        ? "■ Stop & Get Answer"
+        : "🎙 Start talking";
+
+    micButton.disabled = busy || speaking;
+
+}
+
+
+// -----------------------------------------
+// DISPLAY CHAT MESSAGE
+// -----------------------------------------
 
 function addMessage(role, text) {
 
@@ -123,11 +150,11 @@ function addMessage(role, text) {
     heading.textContent =
         role === "user" ? "YOU" : "KAURA";
 
-    const p = document.createElement("p");
+    const paragraph = document.createElement("p");
 
-    p.textContent = text;
+    paragraph.textContent = text;
 
-    content.append(heading, p);
+    content.append(heading, paragraph);
 
     wrap.append(avatar, content);
 
@@ -138,17 +165,21 @@ function addMessage(role, text) {
 }
 
 
-// =========================================
+// -----------------------------------------
 // TEXT TO SPEECH
-// =========================================
+// -----------------------------------------
 
 function speak(text) {
 
     if (!("speechSynthesis" in window)) {
 
-        speaking = false;
+        setStatus(
+            "Answer received. Speech output is unavailable."
+        );
 
-        afterSpeaking();
+        setOrb("");
+
+        updateControls();
 
         return;
 
@@ -173,105 +204,62 @@ function speak(text) {
 
         setStatus("KAURA is speaking...");
 
+        updateControls();
+
     };
 
     utterance.onend = () => {
 
         speaking = false;
 
-        afterSpeaking();
+        setOrb("");
+
+        setStatus(
+            "KAURA has answered. Click the microphone to speak again."
+        );
+
+        updateControls();
 
     };
 
     utterance.onerror = (event) => {
 
-        console.error("Speech synthesis error:", event.error);
+        console.error(
+            "Speech synthesis error:",
+            event.error
+        );
 
         speaking = false;
 
-        afterSpeaking();
+        setOrb("");
+
+        setStatus(
+            "Answer received, but voice playback failed."
+        );
+
+        updateControls();
 
     };
+
+    speaking = true;
+
+    updateControls();
 
     window.speechSynthesis.speak(utterance);
 
 }
 
 
-// =========================================
-// AFTER KAURA SPEAKS
-// =========================================
-
-function afterSpeaking() {
-
-    if (resetWakeAfterSpeech) {
-
-        waitingForCommand = false;
-
-        resetWakeAfterSpeech = false;
-
-    }
-
-    if (!listeningEnabled) {
-
-        setOrb("");
-
-        return;
-
-    }
-
-    setStatus(
-        mode === "wake"
-            ? waitingForCommand
-                ? "I'm listening. Tell me what you need."
-                : 'Listening for "Hey KAURA"...'
-            : "KAURA is listening. Speak when ready."
-    );
-
-    setOrb("listening");
-
-    scheduleRecognitionRestart();
-
-}
-
-
-// =========================================
-// RESTART MANAGEMENT
-// =========================================
-
-function scheduleRecognitionRestart() {
-
-    clearTimeout(restartTimer);
-
-    if (
-        !listeningEnabled ||
-        busy ||
-        speaking ||
-        recognition ||
-        document.hidden
-    ) {
-        return;
-    }
-
-    restartTimer = setTimeout(() => {
-
-        startRecognition();
-
-    }, 900);
-
-}
-
-
-// =========================================
+// -----------------------------------------
 // CREATE RECOGNITION
-// =========================================
+// -----------------------------------------
 
 function createRecognition() {
 
     if (!SpeechRecognition) {
 
         setStatus(
-            "Speech recognition is not supported. Try Chrome."
+            "Speech recognition is not supported. Use Chrome."
         );
 
         return null;
@@ -280,52 +268,24 @@ function createRecognition() {
 
     const r = new SpeechRecognition();
 
-    // One utterance per session is more predictable
-    // across desktop and mobile Chrome.
-
     r.lang = "en-IN";
 
-    r.continuous = false;
+    // Keep listening until the user clicks Stop.
+    r.continuous = true;
 
+    // Display words while the user is speaking.
     r.interimResults = true;
 
-    r.maxAlternatives = 3;
+    r.maxAlternatives = 1;
 
     return r;
 
 }
 
 
-// =========================================
-// WAKE PHRASE DETECTION
-// =========================================
-
-function extractWakeCommand(transcript) {
-
-    const cleaned = transcript
-        .toLowerCase()
-        .replace(/[.,!?;:]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    /*
-       Speech recognition sometimes interprets
-       KAURA as Cora, Kara or Koura.
-
-       These alternatives are accepted as wake phrases.
-    */
-
-    const wakePattern =
-        /\bhey\s+(?:kaura|cora|kara|koura|coura|kaora)\b\s*(.*)$/i;
-
-    return cleaned.match(wakePattern);
-
-}
-
-
-// =========================================
-// START RECOGNITION
-// =========================================
+// -----------------------------------------
+// START RECOGNITION SESSION
+// -----------------------------------------
 
 function startRecognition() {
 
@@ -345,39 +305,30 @@ function startRecognition() {
 
     recognition = r;
 
-    commandAlreadySent = false;
-
-
-    // RECOGNITION STARTED
-
     r.onstart = () => {
 
         if (recognition !== r) return;
 
-        console.log("KAURA recognition started.");
+        console.log("KAURA microphone started.");
 
         setOrb("listening");
 
         setStatus(
-            mode === "wake"
-                ? waitingForCommand
-                    ? "I'm listening for your command."
-                    : 'Listening... Say "Hey KAURA".'
-                : "I'm listening. Speak now."
+            "Listening continuously. Speak everything, then click Stop & Get Answer."
         );
 
     };
 
 
-    // SPEECH RESULT
+    // -------------------------------------
+    // LIVE SPEECH TRANSCRIPTION
+    // -------------------------------------
 
     r.onresult = (event) => {
 
         if (recognition !== r) return;
 
-        let finalTranscript = "";
-
-        let interimTranscript = "";
+        interimTranscript = "";
 
         for (
             let i = event.resultIndex;
@@ -390,11 +341,14 @@ function startRecognition() {
             const transcript =
                 result[0].transcript.trim();
 
-            // Never send interim results to Gemini.
-
             if (result.isFinal) {
 
                 finalTranscript += transcript + " ";
+
+                console.log(
+                    "KAURA final speech:",
+                    transcript
+                );
 
             } else {
 
@@ -404,107 +358,21 @@ function startRecognition() {
 
         }
 
+        const completeText =
+            (
+                finalTranscript +
+                interimTranscript
+            ).trim();
 
-        // Show interim speech in the browser console.
-        if (interimTranscript.trim()) {
+        if (completeText) {
 
-            console.log(
-                "KAURA hearing:",
-                interimTranscript.trim()
+            setStatus(
+                "Listening: " + completeText
             );
 
-        }
-
-
-        finalTranscript = finalTranscript.trim();
-
-        if (!finalTranscript) return;
-
-        if (commandAlreadySent) return;
-
-
-        console.log(
-            "KAURA final transcript:",
-            finalTranscript
-        );
-
-
-        // VOICE CONVERSATION MODE
-
-        if (mode === "conversation") {
-
-            commandAlreadySent = true;
-
-            stopRecognition();
-
-            sendMessage(finalTranscript, true);
-
-            return;
-
-        }
-
-
-        // WAKE MODE: ALREADY AWAKENED
-
-        if (waitingForCommand) {
-
-            commandAlreadySent = true;
-
-            waitingForCommand = false;
-
-            resetWakeAfterSpeech = true;
-
-            stopRecognition();
-
-            sendMessage(finalTranscript, true);
-
-            return;
-
-        }
-
-
-        // WAKE MODE: DETECT WAKE PHRASE
-
-        const match = extractWakeCommand(finalTranscript);
-
-        if (!match) {
-
             console.log(
-                "Wake phrase not detected:",
-                finalTranscript
-            );
-
-            return;
-
-        }
-
-        const command = (match[1] || "").trim();
-
-        commandAlreadySent = true;
-
-        stopRecognition();
-
-
-        // Wake phrase and command in the same sentence.
-
-        if (command) {
-
-            waitingForCommand = false;
-
-            resetWakeAfterSpeech = true;
-
-            sendMessage(command, true);
-
-        } else {
-
-            // User only said "Hey KAURA".
-
-            waitingForCommand = true;
-
-            resetWakeAfterSpeech = false;
-
-            speak(
-                "Yes, I'm listening. What can I do for you?"
+                "KAURA transcription:",
+                completeText
             );
 
         }
@@ -512,51 +380,63 @@ function startRecognition() {
     };
 
 
-    // SPEECH ERROR
+    // -------------------------------------
+    // RECOGNITION ERRORS
+    // -------------------------------------
 
     r.onerror = (event) => {
 
-        if (recognition !== r) return;
-
         console.error(
-            "KAURA speech recognition error:",
+            "KAURA recognition error:",
             event.error
         );
 
-        const errors = {
+        if (
+            event.error === "not-allowed" ||
+            event.error === "service-not-allowed" ||
+            event.error === "audio-capture" ||
+            event.error === "language-not-supported"
+        ) {
 
-            "not-allowed":
-                "Microphone permission denied. Allow microphone access.",
+            listeningEnabled = false;
 
-            "service-not-allowed":
-                "Browser speech recognition service is blocked.",
+            stopRequested = false;
 
-            "no-speech":
-                "I couldn't hear you. Please speak again.",
+            recognition = null;
 
-            "network":
-                "Speech recognition network error. Check your internet.",
+            updateControls();
 
-            "audio-capture":
-                "No microphone detected.",
+            setOrb("");
 
-            "language-not-supported":
-                "English recognition is unavailable.",
+            const errors = {
 
-            "aborted":
-                "Speech recognition interrupted."
+                "not-allowed":
+                    "Microphone permission denied. Allow microphone access.",
 
-        };
+                "service-not-allowed":
+                    "Speech recognition service is blocked.",
 
-        setStatus(
-            errors[event.error] ||
-            "Speech recognition error: " + event.error
-        );
+                "audio-capture":
+                    "No microphone detected.",
+
+                "language-not-supported":
+                    "English recognition is unavailable."
+
+            };
+
+            setStatus(errors[event.error]);
+
+        }
+
+        // no-speech is not fatal:
+        // the user may simply be pausing.
 
     };
 
 
+    // -------------------------------------
     // SESSION ENDED
+    // -------------------------------------
 
     r.onend = () => {
 
@@ -566,6 +446,25 @@ function startRecognition() {
 
             recognition = null;
 
+        }
+
+        // If the user clicked Stop,
+        // process the complete transcript.
+
+        if (stopRequested) {
+
+            processCollectedSpeech();
+
+            return;
+
+        }
+
+        // Otherwise keep listening.
+        // Chrome may end a recognition session
+        // even when continuous mode is enabled.
+
+        if (listeningEnabled) {
+
             scheduleRecognitionRestart();
 
         }
@@ -573,7 +472,9 @@ function startRecognition() {
     };
 
 
+    // -------------------------------------
     // START
+    // -------------------------------------
 
     try {
 
@@ -581,19 +482,17 @@ function startRecognition() {
 
     } catch (error) {
 
-        if (recognition === r) {
-
-            recognition = null;
-
-        }
-
         console.error(
             "Recognition start failed:",
             error
         );
 
+        if (recognition === r) {
+            recognition = null;
+        }
+
         setStatus(
-            "Could not start microphone recognition. Please retry."
+            "Could not start the microphone. Please retry."
         );
 
         scheduleRecognitionRestart();
@@ -603,56 +502,45 @@ function startRecognition() {
 }
 
 
-// =========================================
-// STOP CURRENT RECOGNITION SESSION
-// =========================================
+// -----------------------------------------
+// RESTART IF CHROME ENDS A SESSION
+// -----------------------------------------
 
-function stopRecognition() {
+function scheduleRecognitionRestart() {
 
     clearTimeout(restartTimer);
 
-    if (!recognition) return;
-
-    const old = recognition;
-
-    // Detach the session before stopping it.
-    // Its onend event will not start another session.
-
-    recognition = null;
-
-    try {
-
-        old.stop();
-
-    } catch (error) {
-
-        console.warn(
-            "Recognition stop:",
-            error.message
-        );
-
+    if (
+        !listeningEnabled ||
+        stopRequested ||
+        busy ||
+        speaking ||
+        recognition ||
+        document.hidden
+    ) {
+        return;
     }
+
+    restartTimer = setTimeout(() => {
+
+        startRecognition();
+
+    }, 700);
 
 }
 
 
-// =========================================
-// ENABLE LISTENING
-// =========================================
+// -----------------------------------------
+// START LISTENING
+// -----------------------------------------
 
-function enableListening() {
+function startListening() {
 
     if (!SpeechRecognition) {
 
         setStatus(
             "Speech recognition is not supported. Please use Chrome."
         );
-
-        return;
-
-    }
-
-    if (listeningEnabled) {
 
         return;
 
@@ -668,126 +556,138 @@ function enableListening() {
 
     }
 
-    // Do not await getUserMedia here.
-    // Start recognition directly from the button click.
+    if (busy || speaking) return;
+
+    clearTimeout(restartTimer);
+
+    finalTranscript = "";
+
+    interimTranscript = "";
+
+    stopRequested = false;
+
+    responseStarted = false;
 
     listeningEnabled = true;
 
-    waitingForCommand = false;
-
-    resetWakeAfterSpeech = false;
-
     updateControls();
 
-    setStatus("Starting KAURA microphone...");
+    setStatus("Starting microphone...");
 
     startRecognition();
 
 }
 
 
-// =========================================
-// STOP ALL LISTENING
-// =========================================
+// -----------------------------------------
+// STOP LISTENING
+// -----------------------------------------
 
 function stopListening() {
 
+    if (!listeningEnabled) return;
+
+    // Do not restart recognition after this point.
+
     listeningEnabled = false;
 
-    waitingForCommand = false;
-
-    resetWakeAfterSpeech = false;
+    stopRequested = true;
 
     clearTimeout(restartTimer);
 
-    stopRecognition();
-
-    if ("speechSynthesis" in window) {
-
-        window.speechSynthesis.cancel();
-
-    }
-
-    speaking = false;
-
-    busy = false;
-
     setOrb("");
+
+    setStatus("Finishing your recording...");
 
     updateControls();
 
-}
+    if (recognition) {
 
+        const current = recognition;
 
-// =========================================
-// UPDATE BUTTONS
-// =========================================
+        try {
 
-function updateControls() {
+            // stop() allows final recognition results
+            // to arrive before onend.
 
-    if (micButton) {
+            current.stop();
 
-        micButton.classList.toggle(
-            "hidden",
-            mode !== "wake"
-        );
+        } catch (error) {
 
-        micButton.textContent =
-            listeningEnabled && mode === "wake"
-                ? "■ Stop Hey KAURA"
-                : "🎙 Activate Hey KAURA";
+            console.warn(
+                "Recognition stop:",
+                error
+            );
 
-    }
+            if (recognition === current) {
+                recognition = null;
+            }
 
+            processCollectedSpeech();
 
-    if (liveButton) {
+        }
 
-        liveButton.classList.toggle(
-            "hidden",
-            mode !== "conversation" || listeningEnabled
-        );
+    } else {
 
-        liveButton.textContent =
-            "◉ Start conversation";
-
-    }
-
-
-    if (stopButton) {
-
-        stopButton.classList.toggle(
-            "hidden",
-            !listeningEnabled || mode !== "conversation"
-        );
-
-    }
-
-
-    if (wakeModeButton) {
-
-        wakeModeButton.classList.toggle(
-            "active",
-            mode === "wake"
-        );
-
-    }
-
-
-    if (liveModeButton) {
-
-        liveModeButton.classList.toggle(
-            "active",
-            mode === "conversation"
-        );
+        processCollectedSpeech();
 
     }
 
 }
 
 
-// =========================================
+// -----------------------------------------
+// PROCESS COMPLETE SPEECH
+// -----------------------------------------
+
+async function processCollectedSpeech() {
+
+    if (responseStarted) return;
+
+    responseStarted = true;
+
+    stopRequested = false;
+
+    listeningEnabled = false;
+
+    clearTimeout(restartTimer);
+
+    const completeText =
+        finalTranscript.trim();
+
+    finalTranscript = "";
+
+    interimTranscript = "";
+
+    updateControls();
+
+    setOrb("");
+
+    if (!completeText) {
+
+        setStatus(
+            "I couldn't recognize any complete speech. Click the microphone and try again."
+        );
+
+        return;
+
+    }
+
+    console.log(
+        "Complete KAURA recording:",
+        completeText
+    );
+
+    // Send the entire recording as one question.
+
+    await sendMessage(completeText, true);
+
+}
+
+
+// -----------------------------------------
 // SEND MESSAGE TO GEMINI
-// =========================================
+// -----------------------------------------
 
 async function sendMessage(rawText, shouldSpeak = false) {
 
@@ -797,17 +697,21 @@ async function sendMessage(rawText, shouldSpeak = false) {
 
     busy = true;
 
+    updateControls();
+
     addMessage("user", text);
 
     conversation.push({
+
         role: "user",
+
         content: text
+
     });
 
     setStatus("KAURA is thinking...");
 
     setOrb("active");
-
 
     try {
 
@@ -816,19 +720,21 @@ async function sendMessage(rawText, shouldSpeak = false) {
             method: "POST",
 
             headers: {
+
                 "Content-Type": "application/json"
+
             },
 
             body: JSON.stringify({
+
                 messages: conversation
+
             })
 
         });
 
-
         const data =
             await response.json().catch(() => ({}));
-
 
         if (!response.ok) {
 
@@ -839,90 +745,102 @@ async function sendMessage(rawText, shouldSpeak = false) {
 
         }
 
-
         const answer =
             data.reply ||
             data.response ||
             "I couldn't prepare a response.";
 
-
         conversation.push({
+
             role: "assistant",
+
             content: answer
+
         });
 
         addMessage("assistant", answer);
 
+        busy = false;
 
-        if (
-            shouldSpeak ||
-            (listeningEnabled && mode === "wake")
-        ) {
+        if (shouldSpeak) {
 
             speak(answer);
 
         } else {
 
             setStatus(
-                "KAURA replied. Ask another question."
+                "KAURA replied. Click the microphone to speak."
             );
 
             setOrb("");
 
+            updateControls();
+
         }
 
-    } catch (err) {
+    } catch (error) {
 
         console.error(
             "KAURA request failed:",
-            err
+            error
         );
-
-        // Remove the failed user message from history.
 
         conversation.pop();
 
         const message =
-            err.message ||
+            error.message ||
             "Could not reach the server.";
 
         addMessage(
             "assistant",
-            `I'm sorry, I couldn't connect. ${message}`
+            "I'm sorry, I couldn't connect. " + message
         );
 
         setStatus(message);
 
         setOrb("");
 
-        // Reset wake phrase state after a failed command.
-
-        if (mode === "wake") {
-
-            waitingForCommand = false;
-
-            resetWakeAfterSpeech = false;
-
-        }
-
-    } finally {
-
         busy = false;
 
-        if (listeningEnabled && !speaking) {
-
-            scheduleRecognitionRestart();
-
-        }
+        updateControls();
 
     }
 
 }
 
 
-// =========================================
+// -----------------------------------------
+// MICROPHONE BUTTON
+// -----------------------------------------
+
+if (micButton) {
+
+    micButton.addEventListener("click", () => {
+
+        if (listeningEnabled) {
+
+            // Second click:
+            // Stop recording and get the answer.
+
+            stopListening();
+
+        } else {
+
+            // First click:
+            // Start continuous recording.
+
+            startListening();
+
+        }
+
+    });
+
+}
+
+
+// -----------------------------------------
 // TYPED CHAT
-// =========================================
+// -----------------------------------------
 
 if (chatForm) {
 
@@ -937,6 +855,14 @@ if (chatForm) {
 
             if (!text) return;
 
+            if (listeningEnabled) {
+
+                stopListening();
+
+                return;
+
+            }
+
             messageInput.value = "";
 
             await sendMessage(text, false);
@@ -947,9 +873,9 @@ if (chatForm) {
 }
 
 
-// =========================================
+// -----------------------------------------
 // QUICK PROMPTS
-// =========================================
+// -----------------------------------------
 
 document.querySelectorAll("[data-prompt]").forEach(
     (button) => {
@@ -960,9 +886,7 @@ document.querySelectorAll("[data-prompt]").forEach(
                 button.dataset.prompt || "";
 
             if (messageInput) {
-
                 messageInput.value = prompt;
-
             }
 
             sendMessage(prompt, false);
@@ -973,118 +897,9 @@ document.querySelectorAll("[data-prompt]").forEach(
 );
 
 
-// =========================================
-// HEY KAURA BUTTON
-// =========================================
-
-if (micButton) {
-
-    micButton.addEventListener("click", () => {
-
-        if (listeningEnabled) {
-
-            stopListening();
-
-            setStatus("Hey KAURA mode stopped.");
-
-        } else {
-
-            mode = "wake";
-
-            enableListening();
-
-        }
-
-    });
-
-}
-
-
-// =========================================
-// VOICE CONVERSATION BUTTON
-// =========================================
-
-if (liveButton) {
-
-    liveButton.addEventListener("click", () => {
-
-        mode = "conversation";
-
-        enableListening();
-
-    });
-
-}
-
-
-// =========================================
-// STOP CONVERSATION BUTTON
-// =========================================
-
-if (stopButton) {
-
-    stopButton.addEventListener("click", () => {
-
-        stopListening();
-
-        setStatus("Voice conversation ended.");
-
-    });
-
-}
-
-
-// =========================================
-// MODE SELECTION
-// =========================================
-
-wakeModeButton?.addEventListener(
-    "click",
-    () => {
-
-        if (listeningEnabled) {
-
-            stopListening();
-
-        }
-
-        mode = "wake";
-
-        updateControls();
-
-        setStatus(
-            'Tap Activate Hey KAURA, then say "Hey KAURA".'
-        );
-
-    }
-);
-
-
-liveModeButton?.addEventListener(
-    "click",
-    () => {
-
-        if (listeningEnabled) {
-
-            stopListening();
-
-        }
-
-        mode = "conversation";
-
-        updateControls();
-
-        setStatus(
-            "Tap Start conversation to begin voice chat."
-        );
-
-    }
-);
-
-
-// =========================================
+// -----------------------------------------
 // CLEAR CHAT
-// =========================================
+// -----------------------------------------
 
 if (clearButton) {
 
@@ -1092,18 +907,25 @@ if (clearButton) {
 
         conversation = [];
 
-        if (chatLog) {
+        if (listeningEnabled) {
 
-            chatLog.replaceChildren();
+            listeningEnabled = false;
 
-            const p = document.createElement("p");
+            stopRequested = false;
 
-            p.className = "empty-message";
+            clearTimeout(restartTimer);
 
-            p.textContent =
-                "A fresh conversation. Ask KAURA anything.";
+            if (recognition) {
 
-            chatLog.appendChild(p);
+                const current = recognition;
+
+                recognition = null;
+
+                try {
+                    current.abort();
+                } catch (_) {}
+
+            }
 
         }
 
@@ -1115,24 +937,43 @@ if (clearButton) {
 
         speaking = false;
 
-        setStatus("Conversation cleared.");
+        busy = false;
+
+        finalTranscript = "";
+
+        interimTranscript = "";
+
+        responseStarted = false;
+
+        if (chatLog) {
+
+            chatLog.replaceChildren();
+
+            const message = document.createElement("p");
+
+            message.className = "empty-message";
+
+            message.textContent =
+                "A fresh conversation. Ask KAURA anything.";
+
+            chatLog.appendChild(message);
+
+        }
 
         setOrb("");
 
-        if (listeningEnabled) {
+        setStatus("Conversation cleared.");
 
-            scheduleRecognitionRestart();
-
-        }
+        updateControls();
 
     });
 
 }
 
 
-// =========================================
+// -----------------------------------------
 // PAGE VISIBILITY
-// =========================================
+// -----------------------------------------
 
 document.addEventListener(
     "visibilitychange",
@@ -1142,36 +983,50 @@ document.addEventListener(
 
             stopListening();
 
-            setStatus(
-                "Voice listening stopped because the page is hidden."
-            );
-
         }
 
     }
 );
 
 
-// =========================================
+// -----------------------------------------
 // PAGE CLEANUP
-// =========================================
+// -----------------------------------------
 
 window.addEventListener(
     "pagehide",
-    stopListening
+    () => {
+
+        listeningEnabled = false;
+
+        clearTimeout(restartTimer);
+
+        if (recognition) {
+
+            try {
+                recognition.abort();
+            } catch (_) {}
+
+        }
+
+        if ("speechSynthesis" in window) {
+            window.speechSynthesis.cancel();
+        }
+
+    }
 );
 
 
-// =========================================
+// -----------------------------------------
 // INITIALIZE KAURA
-// =========================================
+// -----------------------------------------
 
 updateControls();
 
 setStatus(
-    "KAURA is ready. Type a message or activate voice mode."
+    "KAURA is ready. Click the microphone to start speaking."
 );
 
 console.log(
-    "KAURA Gemini voice assistant ready."
+    "KAURA continuous recording assistant ready."
 );

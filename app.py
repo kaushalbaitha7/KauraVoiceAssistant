@@ -7,64 +7,94 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+# -----------------------------------------
+# CONFIGURATION
+# -----------------------------------------
+
 load_dotenv()
+
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, static_folder=None)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+GEMINI_MODEL = os.getenv(
+    "GEMINI_MODEL",
+    "gemini-2.5-flash"
+).strip()
+
+client = (
+    genai.Client(api_key=GEMINI_API_KEY)
+    if GEMINI_API_KEY
+    else None
+)
 
 KAURA_SYSTEM_INSTRUCTION = """
-You are KAURA, a warm, capable, helpful personal voice assistant.
+You are KAURA, a warm, capable, helpful personal AI voice assistant.
 
-Speak naturally, like a thoughtful assistant. Be friendly, respectful,
-clear and practical.
+Speak naturally, like a thoughtful human assistant.
 
-Your first response to a greeting should greet the user and ask how
-you can help.
+Be friendly, respectful, clear and practical.
 
 Understand normal conversational language and follow-up questions.
 
 Help with programming, engineering, study, career planning,
 technology, entertainment and general knowledge.
 
-Explain step by step when asked.
+Explain concepts step by step when asked.
 
-For voice responses, be concise unless the user asks for detail.
+For spoken responses, use natural conversational language.
+Avoid unnecessary long responses unless the user asks for detail.
+
+Remember the conversation context supplied in the chat history.
 
 Never claim you performed an action you did not perform.
 
 Your name is KAURA.
 """
 
+# -----------------------------------------
+# WEBSITE
+# -----------------------------------------
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
+# -----------------------------------------
+# CSS
+# -----------------------------------------
 
 @app.route("/style.css")
 def serve_css():
     return send_from_directory("public", "style.css")
 
+# -----------------------------------------
+# JAVASCRIPT
+# -----------------------------------------
 
 @app.route("/script.js")
 def serve_js():
     return send_from_directory("public", "script.js")
 
+# -----------------------------------------
+# HEALTH CHECK
+# -----------------------------------------
 
 @app.route("/health")
 def health():
     return jsonify({
         "status": "online",
         "assistant": "KAURA",
-        "provider": "Google Gemini" if client else "Browser-only fallback",
+        "provider": "Google Gemini" if client else "Not configured",
         "api_configured": bool(client),
         "model": GEMINI_MODEL
     })
+
+# -----------------------------------------
+# GEMINI CHAT API
+# -----------------------------------------
 
 @app.route("/ask", methods=["POST"])
 def ask():
@@ -74,12 +104,18 @@ def ask():
     messages = data.get("messages")
 
     if messages is None:
+
         message = data.get("message", "")
+
         messages = [
-            {"role": "user", "content": message}
+            {
+                "role": "user",
+                "content": message
+            }
         ]
 
     if not isinstance(messages, list) or not messages:
+
         return jsonify({
             "success": False,
             "error": "Please enter a message."
@@ -118,15 +154,17 @@ def ask():
         )
 
     if not history or history[-1].role != "user":
+
         return jsonify({
             "success": False,
             "error": "The last message must be from the user."
         }), 400
 
     if not client:
+
         return jsonify({
             "success": False,
-            "error": "Gemini API key is not configured. Add GEMINI_API_KEY to your .env file."
+            "error": "Gemini API key is not configured."
         }), 503
 
     try:
@@ -158,16 +196,23 @@ def ask():
 
         return jsonify({
             "success": False,
-            "error": "Gemini could not answer right now. Check your API key, model access, quota and server terminal."
+            "error": "Gemini could not answer right now. Check API key, model access, quota and server logs."
         }), 502
 
+# -----------------------------------------
+# 404 ERROR
+# -----------------------------------------
 
 @app.errorhandler(404)
 def not_found(_error):
+
     return jsonify({
         "error": "Route not found."
     }), 404
 
+# -----------------------------------------
+# START SERVER
+# -----------------------------------------
 
 if __name__ == "__main__":
 

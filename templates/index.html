@@ -4,17 +4,12 @@
 
 <head>
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#17251f">
 
     <title>KAURA | AI Voice Assistant</title>
 
-    <link rel="stylesheet" href="/style.css?v=11">
-
-    
+    <link rel="stylesheet" href="/style.css?v=15">
 </head>
 
 <body>
@@ -22,27 +17,18 @@
 <main class="app-shell">
 
     <header class="topbar">
-
         <a class="brand" href="/">
-
             <span class="brand-icon">K</span>
-
             <span>KAURA</span>
-
         </a>
 
         <span class="online-status">
             <i></i> AI SYSTEM READY
         </span>
-
     </header>
 
-
     <section class="hero">
-
-        <p class="eyebrow">
-            YOUR PERSONAL AI COMPANION
-        </p>
+        <p class="eyebrow">YOUR PERSONAL AI COMPANION</p>
 
         <h1>
             A little smarter.<br>
@@ -53,82 +39,32 @@
             Talk naturally. Ask anything.
             Let KAURA help you think, learn and create.
         </p>
-
     </section>
-
 
     <section class="assistant-panel">
 
         <div class="mode-heading">
-
-            <p class="eyebrow">
-                CHOOSE YOUR EXPERIENCE
+            <p class="eyebrow">VOICE ASSISTANT</p>
+            <h2>Talk to KAURA</h2>
+            <p class="hero-description">
+                Tap the microphone and speak naturally.
+                KAURA will listen and answer aloud.
             </p>
-
-            <h2>
-                How would you like to talk?
-            </h2>
-
         </div>
-
-
-        <div class="mode-switch">
-
-            <button
-                class="mode-button active"
-                id="wakeModeButton"
-                type="button">
-
-                <span>✦</span> Hey KAURA
-
-                <small>
-                    Say the wake phrase, then your command
-                </small>
-
-            </button>
-
-
-            <button
-                class="mode-button"
-                id="liveModeButton"
-                type="button">
-
-                <span>◉</span> Voice conversation
-
-                <small>
-                    Tap to speak, KAURA replies aloud
-                </small>
-
-            </button>
-
-        </div>
-
 
         <div class="voice-area">
 
             <div class="orb" id="assistantOrb">
-
                 <div class="orb-inner">
                     <span>K</span>
                 </div>
-
             </div>
 
+            <h2 id="modeTitle">KAURA is ready</h2>
 
-            <h2 id="modeTitle">
-                Hey KAURA mode
-            </h2>
-
-
-            <p
-                id="micStatus"
-                role="status"
-                aria-live="polite">
-
-                Tap below and say “Hey KAURA”.
-
+            <p id="micStatus" role="status" aria-live="polite">
+                Tap the microphone to start talking.
             </p>
-
 
             <div class="voice-controls">
 
@@ -136,40 +72,16 @@
                     id="micButton"
                     class="primary-button"
                     type="button">
-
-                    🎙 Activate Hey KAURA
-
-                </button>
-
-
-                <button
-                    id="liveButton"
-                    class="primary-button hidden"
-                    type="button">
-
-                    ◉ Start conversation
-
-                </button>
-
-
-                <button
-                    id="stopButton"
-                    class="secondary-button hidden"
-                    type="button">
-
-                    End conversation
-
+                    🎙 Start talking
                 </button>
 
             </div>
 
         </div>
 
-
         <div class="divider">
             <span>OR TYPE YOUR MESSAGE</span>
         </div>
-
 
         <form id="chatForm" class="chat-form">
 
@@ -188,75 +100,45 @@
 
         </form>
 
-
         <div class="quick-prompts">
 
-            <button
-                type="button"
-                data-prompt="Hello KAURA, what can you do?">
-
+            <button type="button" data-prompt="Hello KAURA, what can you do?">
                 What can you do?
-
             </button>
 
-
-            <button
-                type="button"
-                data-prompt="Suggest some beautiful Hindi songs.">
-
+            <button type="button" data-prompt="Suggest some beautiful Hindi songs.">
                 Hindi songs
-
             </button>
 
-
-            <button
-                type="button"
-                data-prompt="Give me a Java coding challenge.">
-
+            <button type="button" data-prompt="Give me a Java coding challenge.">
                 Java challenge
-
             </button>
 
-
-            <button
-                type="button"
-                data-prompt="Tell me an interesting fact.">
-
+            <button type="button" data-prompt="Tell me an interesting fact.">
                 Interesting fact
-
             </button>
 
         </div>
 
     </section>
 
-
     <section class="conversation-panel">
 
         <div class="conversation-heading">
 
             <div>
-
-                <p class="eyebrow">
-                    YOUR SESSION
-                </p>
-
+                <p class="eyebrow">YOUR SESSION</p>
                 <h2>Conversation</h2>
-
             </div>
-
 
             <button
                 id="clearButton"
                 class="clear-button"
                 type="button">
-
                 Clear chat
-
             </button>
 
         </div>
-
 
         <div id="chatLog" class="chat-log" aria-live="polite">
 
@@ -265,15 +147,12 @@
                 <span class="welcome-avatar">K</span>
 
                 <div>
-
                     <strong>KAURA</strong>
-
                     <p>
                         Hello! I'm ready when you are.
-                        Say “Hey KAURA” or type a message.
+                        Tap the microphone or type a message.
                         What can I help you with?
                     </p>
-
                 </div>
 
             </div>
@@ -282,18 +161,14 @@
 
     </section>
 
-
     <footer>
-
-        <p>
-            Made with curiosity and a little intelligence.
-        </p>
-
+        <p>Made with curiosity and a little intelligence.</p>
         <span>KAURA © 2026</span>
-
     </footer>
 
 </main>
-<script src="/script.js?v=12"></script>
+
+<script src="/script.js?v=16" defer></script>
+
 </body>
 </html>
