@@ -838,6 +838,7 @@ if (micButton) {
 }
 
 
+
 // -----------------------------------------
 // TYPED CHAT
 // -----------------------------------------
@@ -855,22 +856,21 @@ if (chatForm) {
 
             if (!text) return;
 
-            if (listeningEnabled) {
-
-                stopListening();
-
-                return;
-
-            }
-
             messageInput.value = "";
 
-            await sendMessage(text, false);
+            // Stop any active recording before typed chat.
+            if (listeningEnabled) {
+                stopListening();
+            }
+
+            // true = KAURA speaks the answer aloud.
+            await sendMessage(text, true);
 
         }
     );
 
 }
+
 
 
 // -----------------------------------------
@@ -889,7 +889,7 @@ document.querySelectorAll("[data-prompt]").forEach(
                 messageInput.value = prompt;
             }
 
-            sendMessage(prompt, false);
+            sendMessage(prompt, true);
 
         });
 
