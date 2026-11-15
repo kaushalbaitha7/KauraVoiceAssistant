@@ -1,152 +1,904 @@
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>KAURA Speech Test</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <meta name="theme-color" content="#fdf5eb">
+
+    <title>KAURA | Speech Recognition Diagnostic</title>
+
     <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
+            margin: 0;
+            padding: 25px 16px;
+            min-height: 100vh;
             font-family: Arial, sans-serif;
-            background: #fdf5eb;
             color: #263b32;
-            padding: 25px;
+            background: #fdf5eb;
+        }
+
+        .container {
+            width: min(750px, 100%);
+            margin: auto;
+        }
+
+        h1 {
             text-align: center;
+            font-size: clamp(27px, 6vw, 42px);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #78847b;
+            line-height: 1.6;
+        }
+
+        .panel {
+            margin-top: 22px;
+            padding: 22px;
+            border-radius: 18px;
+            background: white;
+            box-shadow: 0 8px 30px #263b3210;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        button, select {
+            padding: 14px 20px;
+            border: 0;
+            border-radius: 12px;
+            font-size: 15px;
         }
 
         button {
-            padding: 16px 25px;
-            background: #547c61;
             color: white;
-            border: 0;
-            border-radius: 12px;
-            font-size: 17px;
+            background: #547c61;
+            cursor: pointer;
+            font-weight: bold;
         }
 
-        #status, #result, #logs {
-            margin-top: 20px;
-            padding: 15px;
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        button.stop {
+            background: #df805b;
+        }
+
+        select {
+            border: 1px solid #e4e4e4;
             background: white;
+            color: #263b32;
+        }
+
+        .status {
+            padding: 17px;
             border-radius: 12px;
+            background: #edf3eb;
+            text-align: center;
+            line-height: 1.5;
             overflow-wrap: anywhere;
         }
 
-        #result {
-            min-height: 50px;
-            font-size: 20px;
+        .status.error {
+            background: #fbe8e3;
+            color: #a13f2e;
         }
 
-        #logs {
-            text-align: left;
-            font-size: 12px;
-            white-space: pre-wrap;
+        .status.success {
+            background: #e4f2e6;
+            color: #345a42;
         }
+
+        .result {
+            min-height: 110px;
+            padding: 20px;
+            border: 1px solid #e9e5dc;
+            border-radius: 12px;
+            background: #fffdf9;
+            font-size: 22px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+        }
+
+        .label {
+            margin-bottom: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+            color: #df805b;
+        }
+
+        .logs {
+            max-height: 270px;
+            overflow-y: auto;
+            padding: 15px;
+            border-radius: 12px;
+            background: #1f2b26;
+            color: #d9e8d9;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .info {
+            color: #78847b;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            margin-right: 7px;
+            border-radius: 50%;
+            background: #9ba49b;
+        }
+
+        .dot.active {
+            background: #4ca66b;
+            box-shadow: 0 0 0 4px #4ca66b25;
+        }
+
+        footer {
+            margin-top: 25px;
+            color: #78847b;
+            text-align: center;
+            font-size: 12px;
+        }
+
     </style>
+
 </head>
+
 <body>
+
+<div class="container">
 
     <h1>KAURA Voice Diagnostic</h1>
 
-    <p>Tap the button and speak a sentence.</p>
+    <p class="subtitle">
+        Test your microphone, browser speech recognition
+        and live speech-to-text conversion.
+    </p>
 
-    <button id="start">Start Speech Test</button>
 
-    <div id="status">Waiting to start...</div>
+    <!-- CONTROLS -->
 
-    <h3>Recognized text:</h3>
-    <div id="result">Your speech will appear here.</div>
+    <section class="panel">
 
-    <h3>Diagnostic logs:</h3>
-    <div id="logs"></div>
+        <div class="controls">
+
+            <select id="language">
+
+                <option value="en-IN">English (India)</option>
+
+                <option value="en-US">English (US)</option>
+
+                <option value="en-GB">English (UK)</option>
+
+                <option value="hi-IN">Hindi</option>
+
+            </select>
+
+            <button id="startButton">
+                🎙 Start Speech Test
+            </button>
+
+            <button id="stopButton" class="stop" disabled>
+                Stop
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- STATUS -->
+
+    <section class="panel">
+
+        <div class="label">RECOGNITION STATUS</div>
+
+        <div class="status" id="status">
+
+            <span class="dot"></span>
+
+            Waiting to start...
+
+        </div>
+
+    </section>
+
+
+    <!-- LIVE TRANSCRIPTION -->
+
+    <section class="panel">
+
+        <div class="label">LIVE SPEECH TO TEXT</div>
+
+        <div class="result" id="result">
+
+            Your recognized speech will appear here...
+
+        </div>
+
+    </section>
+
+
+    <!-- FINAL RESULT -->
+
+    <section class="panel">
+
+        <div class="label">FINAL TRANSCRIPTION</div>
+
+        <div class="result" id="finalResult">
+
+            No speech recorded yet.
+
+        </div>
+
+    </section>
+
+
+    <!-- DIAGNOSTICS -->
+
+    <section class="panel">
+
+        <div class="label">BROWSER INFORMATION</div>
+
+        <div id="browserInfo" class="info"></div>
+
+    </section>
+
+
+    <!-- LOGS -->
+
+    <section class="panel">
+
+        <div class="label">DIAGNOSTIC LOGS</div>
+
+        <div class="logs" id="logs">
+
+            KAURA diagnostic initialized...
+
+        </div>
+
+        <br>
+
+        <div class="controls">
+
+            <button id="copyButton">
+                Copy Diagnostic Logs
+            </button>
+
+            <button id="clearButton" class="stop">
+                Clear Logs
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <footer>
+        KAURA AI Voice Assistant · Speech Recognition Test
+    </footer>
+
+</div>
+
 
 <script>
+
+"use strict";
+
+
+// ======================================
+// ELEMENTS
+// ======================================
+
 const statusBox = document.getElementById("status");
+
 const resultBox = document.getElementById("result");
+
+const finalResultBox =
+    document.getElementById("finalResult");
+
 const logsBox = document.getElementById("logs");
 
-function log(message) {
-    console.log(message);
-    logsBox.textContent += message + "\n";
-}
+const startButton =
+    document.getElementById("startButton");
 
-const Recognition =
+const stopButton =
+    document.getElementById("stopButton");
+
+const languageSelect =
+    document.getElementById("language");
+
+const browserInfo =
+    document.getElementById("browserInfo");
+
+
+// ======================================
+// STATE
+// ======================================
+
+const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
 
+let recognition = null;
+
+let isRunning = false;
+
+let isStarting = false;
+
+let finalTranscript = "";
+
+let startTimer = null;
+
+
+// ======================================
+// LOGGING
+// ======================================
+
+function log(message) {
+
+    const time = new Date().toLocaleTimeString();
+
+    const line = `[${time}] ${message}`;
+
+    console.log(line);
+
+    logsBox.textContent += line + "\n";
+
+    logsBox.scrollTop = logsBox.scrollHeight;
+
+}
+
+
+function setStatus(message, type = "") {
+
+    statusBox.className = "status";
+
+    if (type) {
+        statusBox.classList.add(type);
+    }
+
+    statusBox.innerHTML = "";
+
+    const dot = document.createElement("span");
+
+    dot.className = "dot";
+
+    if (type === "success") {
+        dot.classList.add("active");
+    }
+
+    statusBox.appendChild(dot);
+
+    statusBox.appendChild(
+        document.createTextNode(message)
+    );
+
+}
+
+
+// ======================================
+// BROWSER INFORMATION
+// ======================================
+
+browserInfo.textContent =
+    "Browser: " + navigator.userAgent +
+    "\nOnline: " + navigator.onLine +
+    "\nSecure context: " + window.isSecureContext +
+    "\nSpeech Recognition API: " + Boolean(SpeechRecognition) +
+    "\nMicrophone API: " +
+    Boolean(navigator.mediaDevices?.getUserMedia);
+
+
+log("KAURA diagnostic initialized.");
+
 log("Browser: " + navigator.userAgent);
-log("Recognition API: " + Boolean(Recognition));
 
-if (!Recognition) {
-    statusBox.textContent =
-        "Speech Recognition API NOT SUPPORTED";
-} else {
+log("Online: " + navigator.onLine);
 
-    const recognition = new Recognition();
+log("Secure context: " + window.isSecureContext);
 
-    recognition.lang = "en-IN";
-    recognition.continuous = false;
-    recognition.interimResults = true;
+log("Speech Recognition supported: " + Boolean(SpeechRecognition));
 
-    recognition.onstart = () => {
-        statusBox.textContent = "Microphone started. Speak now.";
-        log("EVENT: onstart");
+
+// ======================================
+// CHECK SUPPORT
+// ======================================
+
+if (!SpeechRecognition) {
+
+    setStatus(
+        "Speech Recognition API is not supported by this browser.",
+        "error"
+    );
+
+    startButton.disabled = true;
+
+    log("ERROR: Speech Recognition API unavailable.");
+
+}
+
+
+// ======================================
+// CREATE RECOGNITION
+// ======================================
+
+function createRecognition() {
+
+    const r = new SpeechRecognition();
+
+    r.lang = languageSelect.value;
+
+    r.continuous = false;
+
+    r.interimResults = true;
+
+    r.maxAlternatives = 3;
+
+    return r;
+
+}
+
+
+// ======================================
+// START RECOGNITION
+// ======================================
+
+function startTest() {
+
+    if (!SpeechRecognition) {
+        return;
+    }
+
+    if (isRunning || isStarting) {
+
+        log("Recognition is already running or starting.");
+
+        return;
+
+    }
+
+    if (!navigator.onLine) {
+
+        setStatus(
+            "Internet connection unavailable.",
+            "error"
+        );
+
+        return;
+
+    }
+
+    finalTranscript = "";
+
+    resultBox.textContent = "Listening...";
+
+    finalResultBox.textContent = "Waiting for final speech...";
+
+    logsBox.textContent = "";
+
+    isStarting = true;
+
+    startButton.disabled = true;
+
+    stopButton.disabled = false;
+
+    const currentRecognition = createRecognition();
+
+    recognition = currentRecognition;
+
+
+    currentRecognition.onstart = () => {
+
+        if (recognition !== currentRecognition) return;
+
+        isStarting = false;
+
+        isRunning = true;
+
+        setStatus(
+            "Microphone active. Speak now.",
+            "success"
+        );
+
+        log("EVENT: recognition started.");
+
     };
 
-    recognition.onaudiostart = () => {
-        log("EVENT: onaudiostart");
+
+    currentRecognition.onaudiostart = () => {
+
+        log("EVENT: microphone audio started.");
+
     };
 
-    recognition.onsoundstart = () => {
-        log("EVENT: onsoundstart");
+
+    currentRecognition.onsoundstart = () => {
+
+        log("EVENT: sound detected.");
+
     };
 
-    recognition.onspeechstart = () => {
-        log("EVENT: onspeechstart");
+
+    currentRecognition.onspeechstart = () => {
+
+        log("EVENT: speech detected.");
+
+        setStatus(
+            "Speech detected. Keep speaking.",
+            "success"
+        );
+
     };
 
-    recognition.onresult = (event) => {
 
-        let text = "";
+    currentRecognition.onresult = (event) => {
 
-        for (let i = event.resultIndex;
-             i < event.results.length; i++) {
+        let interimTranscript = "";
 
-            text += event.results[i][0].transcript + " ";
+        for (
+            let i = event.resultIndex;
+            i < event.results.length;
+            i++
+        ) {
+
+            const result = event.results[i];
+
+            const transcript =
+                result[0].transcript.trim();
+
+            if (result.isFinal) {
+
+                finalTranscript += transcript + " ";
+
+                log("FINAL TRANSCRIPT: " + transcript);
+
+            } else {
+
+                interimTranscript += transcript + " ";
+
+                log("INTERIM TRANSCRIPT: " + transcript);
+
+            }
 
         }
 
-        resultBox.textContent = text;
 
-        log("TRANSCRIPT: " + text);
+        const liveText =
+            (finalTranscript + interimTranscript).trim();
+
+        resultBox.textContent =
+            liveText || "Listening...";
+
+        if (finalTranscript.trim()) {
+
+            finalResultBox.textContent =
+                finalTranscript.trim();
+
+        }
+
     };
 
-    recognition.onerror = (event) => {
-        statusBox.textContent =
-            "Recognition error: " + event.error;
 
-        log("ERROR: " + event.error);
+    currentRecognition.onerror = (event) => {
+
+        log("RECOGNITION ERROR: " + event.error);
+
+        if (event.message) {
+            log("ERROR MESSAGE: " + event.message);
+        }
+
+        const errors = {
+
+            "not-allowed":
+                "Microphone or speech recognition permission denied.",
+
+            "service-not-allowed":
+                "Browser speech recognition service is blocked.",
+
+            "no-speech":
+                "No speech detected. Speak closer to the microphone.",
+
+            "network":
+                "Speech recognition network error. Check internet.",
+
+            "audio-capture":
+                "No microphone detected.",
+
+            "language-not-supported":
+                "Selected language is unavailable.",
+
+            "aborted":
+                "Recognition was interrupted."
+
+        };
+
+        setStatus(
+            errors[event.error] ||
+            "Recognition error: " + event.error,
+            "error"
+        );
+
     };
 
-    recognition.onend = () => {
-        log("EVENT: onend");
-        statusBox.textContent += " | Recognition ended.";
+
+    currentRecognition.onend = () => {
+
+        if (recognition !== currentRecognition) return;
+
+        isRunning = false;
+
+        isStarting = false;
+
+        recognition = null;
+
+        startButton.disabled = false;
+
+        stopButton.disabled = true;
+
+        clearTimeout(startTimer);
+
+        if (finalTranscript.trim()) {
+
+            finalResultBox.textContent =
+                finalTranscript.trim();
+
+            setStatus(
+                "Speech successfully converted into text.",
+                "success"
+            );
+
+        } else {
+
+            setStatus(
+                "Recognition ended without a final transcript. Check logs.",
+                "error"
+            );
+
+        }
+
+        log("EVENT: recognition ended.");
+
     };
 
-    document.getElementById("start").onclick = () => {
 
-        resultBox.textContent = "Listening...";
+    try {
+
+        log("Starting speech recognition...");
+
+        currentRecognition.start();
+
+        // Safety timeout if the browser never fires onstart.
+        startTimer = setTimeout(() => {
+
+            if (
+                recognition === currentRecognition &&
+                isStarting
+            ) {
+
+                log("WARNING: Recognition start timed out.");
+
+                isStarting = false;
+
+                try {
+                    currentRecognition.abort();
+                } catch (_) {}
+
+                if (recognition === currentRecognition) {
+                    recognition = null;
+                }
+
+                startButton.disabled = false;
+
+                stopButton.disabled = true;
+
+                setStatus(
+                    "Recognition failed to start. Check browser support.",
+                    "error"
+                );
+
+            }
+
+        }, 10000);
+
+    } catch (error) {
+
+        clearTimeout(startTimer);
+
+        isRunning = false;
+
+        isStarting = false;
+
+        recognition = null;
+
+        startButton.disabled = false;
+
+        stopButton.disabled = true;
+
+        log("START ERROR: " + error.message);
+
+        setStatus(error.message, "error");
+
+    }
+
+}
+
+
+// ======================================
+// STOP RECOGNITION
+// ======================================
+
+function stopTest() {
+
+    clearTimeout(startTimer);
+
+    if (!recognition) return;
+
+    const current = recognition;
+
+    log("Stopping recognition...");
+
+    recognition = null;
+
+    isRunning = false;
+
+    isStarting = false;
+
+    startButton.disabled = false;
+
+    stopButton.disabled = true;
+
+    try {
+
+        current.stop();
+
+    } catch (error) {
+
+        log("STOP ERROR: " + error.message);
+
+    }
+
+    setStatus("Recognition stopped.");
+
+}
+
+
+// ======================================
+// BUTTON EVENTS
+// ======================================
+
+startButton.addEventListener(
+    "click",
+    startTest
+);
+
+stopButton.addEventListener(
+    "click",
+    stopTest
+);
+
+
+// ======================================
+// LANGUAGE CHANGE
+// ======================================
+
+languageSelect.addEventListener(
+    "change",
+    () => {
+
+        log("Language selected: " + languageSelect.value);
+
+    }
+);
+
+
+// ======================================
+// COPY LOGS
+// ======================================
+
+document.getElementById("copyButton")
+    .addEventListener("click", async () => {
+
+        try {
+
+            await navigator.clipboard.writeText(
+                logsBox.textContent
+            );
+
+            setStatus(
+                "Diagnostic logs copied.",
+                "success"
+            );
+
+        } catch (error) {
+
+            log("COPY ERROR: " + error.message);
+
+        }
+
+    });
+
+
+// ======================================
+// CLEAR LOGS
+// ======================================
+
+document.getElementById("clearButton")
+    .addEventListener("click", () => {
 
         logsBox.textContent = "";
 
+        log("Logs cleared.");
+
+    });
+
+
+// ======================================
+// NETWORK STATUS
+// ======================================
+
+window.addEventListener("offline", () => {
+
+    log("NETWORK: Browser went offline.");
+
+    setStatus("Internet connection lost.", "error");
+
+});
+
+
+window.addEventListener("online", () => {
+
+    log("NETWORK: Browser is online again.");
+
+    setStatus("Internet connection restored.", "success");
+
+});
+
+
+// ======================================
+// PAGE CLEANUP
+// ======================================
+
+window.addEventListener("pagehide", () => {
+
+    clearTimeout(startTimer);
+
+    if (recognition) {
+
         try {
-            recognition.start();
-            statusBox.textContent = "Starting...";
-        } catch (error) {
-            log("START ERROR: " + error.message);
-            statusBox.textContent = error.message;
-        }
-    };
-}
+            recognition.abort();
+        } catch (_) {}
+
+    }
+
+});
+
 </script>
 
 </body>

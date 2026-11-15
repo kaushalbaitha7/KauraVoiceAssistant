@@ -224,6 +224,7 @@ function createRecognition() {
 }
 
 
+
 function startRecognition() {
 
     if (
@@ -244,127 +245,78 @@ function startRecognition() {
 
     commandAlreadySent = false;
 
-    setOrb("listening");
+    r.onstart = () => {
+        console.log("KAURA recognition started");
 
-    setStatus(
-        mode === "wake"
-            ? 'Listening for "Hey KAURA"...'
-            : "Listening... speak naturally."
-    );
+        setOrb("listening");
 
+        setStatus(
+            mode === "wake"
+                ? 'Listening... Say "Hey KAURA".'
+                : "I'm listening. Speak now."
+        );
+    };
 
     r.onresult = (event) => {
 
-        let finalText = "";
+        const transcript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join(" ")
+            .trim();
 
-        let interimText = "";
+        console.log("KAURA recognized:", transcript);
 
-        for (
-            let i = event.resultIndex;
-            i < event.results.length;
-            i++
-        ) {
+        if (!transcript) return;
 
-            const transcript =
-                event.results[i][0].transcript.trim();
-
-            if (event.results[i].isFinal) {
-
-                finalText += " " + transcript;
-
-            } else {
-
-                interimText += " " + transcript;
-
-            }
-
-        }
-
+        if (commandAlreadySent) return;
 
         if (mode === "wake") {
 
-            const combined =
-                (finalText + " " + interimText).trim();
-
-            const match = combined.match(
+            const match = transcript.match(
                 /\bhey\s+kaura\b[\s,.:;-]*(.*)/i
             );
 
-            if (!match) return;
+            if (!match) {
+                return;
+            }
+
+            commandAlreadySent = true;
 
             const command = match[1].trim();
 
             stopRecognition();
 
-            if (command.length > 1) {
-
+            if (command) {
                 sendMessage(command, true);
-
             } else {
-
-                setStatus(
-                    "Yes, I'm listening. What can I do for you?"
-                );
-
                 speak(
                     "Yes, I'm listening. What can I do for you?"
                 );
-
             }
 
-            return;
-
-        }
-
-
-        if (
-            finalText.trim() &&
-            !commandAlreadySent
-        ) {
+        } else {
 
             commandAlreadySent = true;
 
-            const command = finalText.trim();
-
             stopRecognition();
 
-            sendMessage(command, true);
+            sendMessage(transcript, true);
 
         }
-
     };
-
 
     r.onerror = (event) => {
 
-        console.warn(
-            "Speech recognition error:",
+        console.error(
+            "KAURA speech error:",
             event.error
         );
 
-        if (
-            event.error === "not-allowed" ||
-            event.error === "service-not-allowed"
-        ) {
-
-            stopListening();
-
-            setStatus(
-                "Microphone permission blocked. Allow microphone access in browser settings."
-            );
-
-        } else if (event.error === "no-speech") {
-
-            setStatus(
-                mode === "wake"
-                    ? 'Still here. Say "Hey KAURA".'
-                    : "I didn't hear anything. Try speaking again."
-            );
-
-        }
+        setStatus(
+            "Speech error: " + event.error
+        );
 
     };
-
 
     r.onend = () => {
 
@@ -376,18 +328,19 @@ function startRecognition() {
 
     };
 
-
     try {
 
         r.start();
 
-    } catch (err) {
+    } catch (error) {
 
-        recognition = null;
+        if (recognition === r) {
+            recognition = null;
+        }
 
-        console.warn(
-            "Recognition start:",
-            err
+        console.error(
+            "Recognition start failed:",
+            error
         );
 
         scheduleRecognitionRestart();
